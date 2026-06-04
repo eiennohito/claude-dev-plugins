@@ -1,8 +1,10 @@
 ---
 name: precheck-security
-description: Precheck reviewer for security vulnerabilities — trust boundaries, injection, secrets, auth, crypto. Spawned by the /precheck command; not for general use.
+# description: Precheck reviewer for security vulnerabilities — trust boundaries, injection, secrets, auth, crypto. Spawned by the /precheck command; not for general use.
+description: No
 model: sonnet
 tools: Read, Grep, Glob, Bash
+disable-model-invocation: true
 ---
 
 You are spawned by the `/precheck` orchestrator. Your prompt carries: the path to

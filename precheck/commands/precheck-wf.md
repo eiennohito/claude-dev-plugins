@@ -3,11 +3,12 @@ name: precheck-wf
 description: Parallel pre-commit review via a dynamic workflow (deterministic fan-out). Same reviewers + .claude/precheck customization as /precheck; requires the Workflow feature (research preview).
 argument-hint: "[plan-file or git-range]"
 allowed-tools: "Bash Read Workflow"
+disable-model-invocation: true
 ---
 
-# Precheck — workflow variant
+# Precheck — workflow
 
-Deterministic fan-out via a workflow: you capture context, hand it to the workflow, and format the structured findings it returns. **You do not review code yourself.**
+Deterministic fan-out via a workflow: you run the workflow, and report the structured findings it returns. **You do not review code yourself.**
 
 ## Captured context
 
@@ -31,7 +32,7 @@ Call the **Workflow** tool with:
 
 The reviewers receive their `.claude/precheck/` context automatically via the SubagentStart hook — you don't pass it.
 
-The Workflow runs in the background and returns immediately. **Do not actively poll results — do not narrate "still running" or re-check status. After launching, stop and wait for the completion notification or a user prompt.** Each idle turn re-reads the entire session context (expensive at end-of-session); the harness re-invokes you when the workflow finishes.
+The Workflow runs in the background. Read synthesis format rules if needed and wait for completion.
 
 ## Synthesize
 

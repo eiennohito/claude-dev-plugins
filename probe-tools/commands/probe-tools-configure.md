@@ -2,6 +2,7 @@
 name: probe-tools-configure
 description: Walk the user through creating or editing this repo's .claude/probe-tools.py — the per-project config that extends what the probe-tools plugin detects and injects at session start (extra tools, package managers, skips, and custom probes like justfile targets).
 allowed-tools: "Bash Read Write Edit AskUserQuestion"
+disable-model-invocation: true
 ---
 
 # probe-tools — configure `.claude/probe-tools.py`

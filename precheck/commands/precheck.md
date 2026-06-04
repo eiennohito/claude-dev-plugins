@@ -3,6 +3,7 @@ name: precheck
 description: Parallel code review before commit. Spawns reviewer subagents over the current diff (reusability, security, quality, efficiency, plan coverage, doc sync), then synthesizes a severity-ranked report. Customizable per-project via .claude/precheck/.
 argument-hint: "[plan-file or git-range]"
 allowed-tools: "Bash Read Agent"
+disable-model-invocation: true
 ---
 
 # Precheck — parallel code review

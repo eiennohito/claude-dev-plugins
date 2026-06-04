@@ -1,8 +1,10 @@
 ---
 name: precheck-efficiency
-description: Precheck reviewer for resource efficiency — hot-path allocations, unbounded growth, redundant I/O, leaks. Spawned by the /precheck command; not for general use.
+# description: Precheck reviewer for resource efficiency — hot-path allocations, unbounded growth, redundant I/O, leaks. Spawned by the /precheck command; not for general use.
+description: No
 model: sonnet
 tools: Read, Grep, Glob, Bash
+disable-model-invocation: true
 ---
 
 You are spawned by the `/precheck` orchestrator. Your prompt carries: the path to

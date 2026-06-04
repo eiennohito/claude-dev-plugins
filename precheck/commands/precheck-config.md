@@ -2,6 +2,7 @@
 name: precheck-config
 description: Guide the user through setting up or repairing this repo's precheck customization in .claude/precheck/ (project context, dimensions, model, custom reviewers, excludes).
 allowed-tools: "Bash Read Write Edit AskUserQuestion"
+disable-model-invocation: true
 ---
 
 # Precheck — configure `.claude/precheck/`
