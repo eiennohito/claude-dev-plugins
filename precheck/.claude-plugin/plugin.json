@@ -1,0 +1,8 @@
+{
+  "name": "precheck",
+  "version": "0.1.0",
+  "description": "Parallel pre-commit code review. Spawns independent subagents to review the current diff (reusability, security, quality, efficiency, plan coverage, doc sync), then synthesizes a severity-ranked report. Language-agnostic; customizable per-project via a .claude/precheck/ directory.",
+  "author": {
+    "name": "Arseny Teramachi"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$comment": "Copy this directory to <your-repo>/.claude/precheck/ and edit. Everything here is optional; delete what you don't need. With no .claude/precheck/ at all, precheck runs all six reviewers with generic rules.",
+
+  "dimensions": ["docs", "reusability", "plan-coverage", "quality", "security", "efficiency"],
+
+  "model": "sonnet",
+
+  "custom": [
+    {
+      "name": "accessibility",
+      "instructions": "You review UI changes for accessibility: missing labels/alt text, color-contrast issues, focus order, and keyboard/screen-reader support. Only flag real, observable problems in the changed code."
+    }
+  ]
+}

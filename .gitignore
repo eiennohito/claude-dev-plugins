@@ -1,0 +1,13 @@
+# Python bytecode (from running/compiling the bin/ scripts)
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+
+# Editor cruft
+*.swp
+*~
+
+# Local-only Claude settings (machine-specific, not shared)
+.claude/settings.local.json

@@ -1,0 +1,16 @@
+# Paths to drop from the diff before review (gitignore-style globs, ** allowed).
+# The .precheck/ directory itself is always excluded automatically.
+# Lines starting with # are comments; blank lines are ignored.
+
+# Lockfiles
+*.lock
+package-lock.json
+pnpm-lock.yaml
+
+# Generated / vendored code
+generated/**
+**/*.pb.go
+vendor/**
+
+# Snapshots and fixtures
+**/__snapshots__/**
