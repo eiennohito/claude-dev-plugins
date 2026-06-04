@@ -1,8 +1,10 @@
 # CLAUDE.md
 
-This repo develops **Claude Code plugins** (currently `precheck/` — a parallel
-pre-commit code-review plugin). The plugin's own docs live in
-[`precheck/README.md`](precheck/README.md).
+This repo is a **Claude Code plugin marketplace** (`.claude-plugin/marketplace.json`,
+see [`README.md`](README.md)) bundling two plugins: `precheck/` (parallel
+pre-commit code review) and `probe-tools/` (session-start tool detection). Each
+plugin's own docs live in its `README.md`
+([precheck](precheck/README.md), [probe-tools](probe-tools/README.md)).
 
 This file captures **durable, generalizable lessons about developing Claude Code
 plugins** — gotchas, the cost model, and conventions. Every rule states its

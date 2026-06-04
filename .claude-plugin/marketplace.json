@@ -1,0 +1,18 @@
+{
+  "name": "claude-dev-plugins",
+  "description": "Claude Code plugins for development workflows: parallel pre-commit code review (precheck) and session-start tool detection (probe-tools).",
+  "owner": {
+    "name": "Arseny Teramachi",
+    "email": "arseny@teramachi.im"
+  },
+  "plugins": [
+    {
+      "name": "precheck",
+      "source": "./precheck"
+    },
+    {
+      "name": "probe-tools",
+      "source": "./probe-tools"
+    }
+  ]
+}
