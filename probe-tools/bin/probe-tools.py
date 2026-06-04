@@ -263,6 +263,14 @@ def _render_context(report):
         lines.append("")
         for cmd, desc, ver in available:
             lines.append(f"- {desc} ({ver})")
+        pipe_unsafe = [cmd for cmd, _, _ in available if cmd in ("rg", "fd")]
+        if pipe_unsafe:
+            lines.append("")
+            names = " and ".join(pipe_unsafe)
+            lines.append(
+                f"IMPORTANT: {names} hang when piped (e.g. `rg pattern | head`)."
+                " Use their built-in flags instead (rg: -m/--max-count, -l; fd: --max-results)."
+            )
     else:
         lines.append("(none of the probed modern-CLI tools were found)")
     lines.append("")

@@ -1,6 +1,6 @@
 {
   "name": "probe-tools",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Detects the tools actually installed on this machine (modern CLI replacements, package managers, project-specific binaries) at session start and injects a concise capability summary into context — so the agent reaches for the fast/available tool instead of guessing or burning calls discovering what exists. Cross-platform; extensible per-project via .claude/probe-tools.py.",
   "author": {
     "name": "Arseny Teramachi"
