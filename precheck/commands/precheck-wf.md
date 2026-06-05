@@ -18,7 +18,11 @@ python3 "${CLAUDE_PLUGIN_ROOT}/bin/capture-diff.py" $ARGUMENTS
 
 If `DIFF_EMPTY=1`, tell the user there's nothing to review and stop.
 
-## Run the workflow
+## Step 1 — Read synthesis format
+
+If you have not already read `${CLAUDE_PLUGIN_ROOT}/lib/synthesis.md` in this session, read it now (before launching the workflow).
+
+## Step 2 — Launch workflow
 
 Call the **Workflow** tool with:
 - `scriptPath`: `${CLAUDE_PLUGIN_ROOT}/workflows/precheck.mjs`
@@ -32,8 +36,12 @@ Call the **Workflow** tool with:
 
 The reviewers receive their `.claude/precheck/` context automatically via the SubagentStart hook — you don't pass it.
 
-The Workflow runs in the background. Read synthesis format rules if needed and wait for completion.
+Note the **Task ID** from the Workflow tool result.
 
-## Synthesize
+## Step 3 — Wait then synthesize
 
-When the workflow completes, format its `findings` (each tagged with `agent`) into the report by following `${CLAUDE_PLUGIN_ROOT}/lib/synthesis.md`. Note any `dimensionsFailed` in one line.
+The workflow runs in the background. After calling Workflow, **emit nothing** — no text, no tool calls.
+
+**The sole trigger for synthesis** is a `<task-notification>` whose `<task-id>` matches the Task ID from Step 2 and whose `<status>` is `completed`. No other event (task reminders, attachments, progress updates, other task IDs) triggers synthesis.
+
+When that notification arrives, synthesize the report from its `<result>` `findings` array following the synthesis format. Note any `dimensionsFailed` in one line.
