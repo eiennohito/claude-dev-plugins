@@ -173,9 +173,12 @@ every turn**. Internalize this model:
   rules reach the orchestrator without changing the command body or the read
   instruction; the hook fires on every Read but exits immediately for non-matching
   paths (< 1ms).*
-- **Hooks degrade silently — design for absence.** Provide a fallback when the hook
-  can't run (e.g. agents self-read the files). *Reason: hooks can be disabled in
-  settings, or a dependency may be missing; the feature shouldn't hard-fail.*
+- **Prefer hook injection over having agents run commands.** When data can be
+  prepared deterministically (file expansion, availability checks, config reads),
+  do it in a `SubagentStart` hook and inject the result. An agent running shell
+  commands to gather the same data costs turns, invites improvisation, and needs
+  permission grants. *Reason: hooks are free (no tokens, no turns, no approvals),
+  deterministic, and invisible to the agent — it just sees the injected context.*
 
 ## Dynamic workflows
 

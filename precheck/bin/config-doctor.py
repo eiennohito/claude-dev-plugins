@@ -9,6 +9,7 @@ well-formed (known dimensions, well-formed custom reviewers), plus repo signals
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections import Counter
@@ -21,7 +22,7 @@ INC_EXTS = {".md", ".txt", ".rst", ".json", ".yaml", ".yml", ".toml", ".cfg",
 
 KNOWN_DIMS = ["reusability", "security", "quality", "efficiency", "plan-coverage", "docs"]
 DEFAULT_ORDER = ["docs", "reusability", "plan-coverage", "quality", "security", "efficiency"]
-KNOWN_KEYS = {"dimensions", "model", "custom"}
+KNOWN_KEYS = {"dimensions", "model", "custom", "codex"}
 EXT_LANG = {
     ".py": "Python", ".ts": "TypeScript", ".tsx": "TypeScript", ".js": "JavaScript",
     ".jsx": "JavaScript", ".rs": "Rust", ".go": "Go", ".java": "Java", ".kt": "Kotlin",
@@ -127,6 +128,48 @@ def main():
                 issues.append('"custom" must be a list of {name, instructions}')
             else:
                 print("custom reviewers: none")
+            codex = cfg.get("codex")
+            if codex and isinstance(codex, dict):
+                codex_installed = shutil.which("codex") is not None
+                print(f"codex CLI: {'installed' if codex_installed else 'NOT FOUND'}")
+                if not codex_installed:
+                    issues.append("codex CLI not found in PATH — codex reviewers will be skipped at runtime")
+                # $-prefixed settings
+                codex_model = codex.get("$model")
+                codex_effort = codex.get("$effort")
+                if codex_model:
+                    print(f"codex $model: {codex_model}")
+                if codex_effort:
+                    known_efforts = {"none", "minimal", "low", "medium", "high", "xhigh"}
+                    print(f"codex $effort: {codex_effort}")
+                    if codex_effort not in known_efforts:
+                        issues.append(f'codex $effort "{codex_effort}" not recognized. Known: {sorted(known_efforts)}')
+                # dimension entries
+                names = []
+                codex_prompt_files = []
+                for k, v in codex.items():
+                    if k.startswith("$"):
+                        continue
+                    if not isinstance(v, str) or not v:
+                        issues.append(f'codex["{k}"] must be a non-empty string (prompt file path)')
+                    else:
+                        names.append(k)
+                        resolved_path = None
+                        for d in (root, pabs):
+                            cand = os.path.join(d, v)
+                            if os.path.isfile(cand):
+                                resolved_path = cand
+                                break
+                        if resolved_path:
+                            codex_prompt_files.append((f"codex:{k}", resolved_path))
+                        else:
+                            issues.append(f'codex["{k}"]: prompt file "{v}" not found (tried repo root and {pdir}/)')
+                print(f"codex reviewers: {names if names else '(present but empty/malformed)'}")
+            elif codex is not None:
+                issues.append('"codex" must be an object mapping dimension names to prompt file paths')
+            else:
+                codex_prompt_files = []
+                print("codex reviewers: none")
             unknown_keys = [k for k in cfg if k not in KNOWN_KEYS and not k.startswith("$")]
             if unknown_keys:
                 issues.append(f"unknown config key(s): {unknown_keys}. Known: {sorted(KNOWN_KEYS)}")
@@ -135,6 +178,10 @@ def main():
     md_files = [("context.md", os.path.join(pabs, "context.md")),
                 ("synthesis.md", os.path.join(pabs, "synthesis.md"))]
     md_files += [(f"{d}.md", os.path.join(pabs, f"{d}.md")) for d in overrides]
+    try:
+        md_files += codex_prompt_files
+    except NameError:
+        pass
     inc_lines = []
     for label, p in md_files:
         if not os.path.isfile(p):

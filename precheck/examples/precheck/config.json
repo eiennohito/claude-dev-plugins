@@ -5,6 +5,11 @@
 
   "model": "sonnet",
 
+  "codex": {
+    "$comment": "Codex-backed reviewers: each key is a dimension name, value is a prompt file path (resolved relative to repo root, then .claude/precheck/). Requires codex CLI installed. Only works with /precheck-wf. Prompt files support @path includes. Optional $model/$effort override codex CLI defaults (e.g. \"$model\": \"gpt-5.5\", \"$effort\": \"medium\").",
+    "architecture": "codex/architecture-review.md"
+  },
+
   "custom": [
     {
       "name": "accessibility",
