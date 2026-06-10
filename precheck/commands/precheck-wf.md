@@ -18,11 +18,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/bin/capture-diff.py" $ARGUMENTS
 
 If `DIFF_EMPTY=1`, tell the user there's nothing to review and stop.
 
-## Step 1 — Read synthesis format
-
-If you have not already read `${CLAUDE_PLUGIN_ROOT}/lib/synthesis.md` in this session, read it now (before launching the workflow).
-
-## Step 2 — Launch workflow
+## Step 1 — Launch workflow
 
 Call the **Workflow** tool with:
 - `scriptPath`: `${CLAUDE_PLUGIN_ROOT}/workflows/precheck.mjs`
@@ -36,12 +32,16 @@ Call the **Workflow** tool with:
 
 The reviewers receive their `.claude/precheck/` context automatically via the SubagentStart hook — you don't pass it.
 
-Note the **Task ID** from the Workflow tool result.
+## Step 2 — Prepare for synthesis
 
-## Step 3 — Wait then synthesize
+After the Workflow call returns, read `${CLAUDE_PLUGIN_ROOT}/lib/synthesis.md` (unless you already have this session). Then state:
 
-The workflow runs in the background. After calling Workflow, **emit nothing** — no text, no tool calls.
+> Precheck workflow launched (task **XXXXX**). I will produce the report once it completes.
 
-**The sole trigger for synthesis** is a `<task-notification>` whose `<task-id>` matches the Task ID from Step 2 and whose `<status>` is `completed`. No other event (task reminders, attachments, progress updates, other task IDs) triggers synthesis.
+(Use the real Task ID from the Workflow tool result.)
 
-When that notification arrives, synthesize the report from its `<result>` `findings` array following the synthesis format. Note any `dimensionsFailed` in one line.
+You have no findings yet — do not fabricate, guess, or read the task output file. The workflow is still running.
+
+## Step 3 — Synthesize when notified
+
+When a `<task-notification>` arrives whose `<task-id>` matches the Task ID from Step 1 and whose `<status>` is `completed`, synthesize the report from its `<result>` `findings` array following the synthesis format. Note any `dimensionsFailed` in one line.
