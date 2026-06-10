@@ -34,7 +34,7 @@ The reviewers receive their `.claude/precheck/` context automatically via the Su
 
 ## Step 2 — Prepare for synthesis
 
-After the Workflow call returns, read `${CLAUDE_PLUGIN_ROOT}/lib/synthesis.md` (unless you already have this session). Then state:
+After the Workflow call returns, use the **Read** tool to read `${CLAUDE_PLUGIN_ROOT}/lib/synthesis.md` (unless you already have this session). Follow the synthesis spec and any project-specific rules that appear after it. Then state:
 
 > Precheck workflow launched (task **XXXXX**). I will produce the report once it completes.
 

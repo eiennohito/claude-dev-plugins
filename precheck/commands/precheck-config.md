@@ -42,7 +42,9 @@ Use the repo signals to make concrete proposals, then confirm with `AskUserQuest
 
 3. **`<dimension>.md`** (optional) — per-reviewer rules/severity calibration for any dimension the user wants to tune (e.g. `security.md`: "raw SQL is CRITICAL"; `quality.md`: file-size thresholds).
 
-4. **`exclude`** (optional) — gitignore-style globs to drop from review (lockfiles, generated/vendored code, snapshots). Propose from the repo if obvious.
+4. **`synthesis.md`** (optional) — addenda to the base synthesis rules. The orchestrator sees these automatically after reading `lib/synthesis.md` (via a PostToolUse hook). Use for severity overrides by area (`payments/` → at least HIGH), extra report sections, or suppressions for known tech debt. The base rules always apply; this file adds to them.
+
+5. **`exclude`** (optional) — gitignore-style globs to drop from review (lockfiles, generated/vendored code, snapshots). Propose from the repo if obvious.
 
 Templates to copy structure/comments from: `${CLAUDE_PLUGIN_ROOT}/examples/precheck/`.
 

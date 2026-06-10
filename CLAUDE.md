@@ -101,6 +101,13 @@ every turn**. Internalize this model:
 - **Slash commands and skills are the right home for explicit `/command` UX with
   `$ARGUMENTS`; skills are model-invoked.** *Reason: match the invocation model to
   the trigger — don't make something a skill if the user types it as `/x`.*
+- **Command/skill instructions must be oblivious to plugin internals.** The session
+  agent doesn't know about hooks, injection mechanisms, or plugin architecture.
+  Tell it *what to do* ("use the Read tool to read X"), not *why* ("this triggers a
+  hook that appends Y"). If a hook transparently enriches a tool result, the
+  command should just say to follow whatever appears. *Reason: leaking internals
+  confuses the agent (it may try to replicate the hook's job) and couples the
+  instructions to the implementation.*
 
 ## Dev & debugging workflow
 
@@ -144,7 +151,7 @@ every turn**. Internalize this model:
   base context (≈5× cache-create here) and tends to over-explore. Smaller surface =
   cheaper + faster + more predictable.*
 
-## Hooks (esp. `SubagentStart`)
+## Hooks (`SubagentStart`, `PostToolUse`)
 
 - **`SubagentStart` fires for agents spawned inside a dynamic workflow**, matched on
   `agent_type`, and can inject context. *Reason: verified by spike — this is what
@@ -158,6 +165,14 @@ every turn**. Internalize this model:
   (`precheck:precheck-security`) — handle both.** *Reason: which form arrives isn't
   guaranteed; deriving the key with "strip everything up to the last known prefix"
   survives either and won't break on hyphenated names like `plan-coverage`.*
+- **`PostToolUse` on `Read` can transparently append per-project addenda to a
+  plugin-bundled file.** The hook receives `tool_input.file_path` on stdin (JSON);
+  match on the path suffix, then print plain text — it appears as an attachment the
+  agent sees right after the Read result. No JSON envelope needed (unlike
+  `SubagentStart`). *Reason: verified by spike — this lets per-project synthesis
+  rules reach the orchestrator without changing the command body or the read
+  instruction; the hook fires on every Read but exits immediately for non-matching
+  paths (< 1ms).*
 - **Hooks degrade silently — design for absence.** Provide a fallback when the hook
   can't run (e.g. agents self-read the files). *Reason: hooks can be disabled in
   settings, or a dependency may be missing; the feature shouldn't hard-fail.*

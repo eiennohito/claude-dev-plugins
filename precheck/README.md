@@ -51,6 +51,7 @@ For manual setup, see [`examples/precheck/`](examples/precheck).
 | `config.json` | orchestrator | which dimensions run, `model`, extra `custom` reviewers |
 | `context.md` | **every** reviewer | shared project context: stack, priorities, threat model, where docs/plans live |
 | `<dimension>.md` | that one reviewer | extra rules + severity calibration (`security.md`, `quality.md`, …) |
+| `synthesis.md` | orchestrator (at synthesis) | addenda to the base synthesis spec: severity overrides, extra grouping, suppressions |
 | `exclude` | capture script | gitignore-style globs dropped from the diff |
 
 `context.md` / `<dimension>.md` can **include other in-repo files** with `@path`
@@ -65,6 +66,13 @@ spawns, the hook reads the matching `.claude/precheck/` files and injects them a
 files — customization is automatic and costs the main session nothing. (Custom
 reviewers run as `general-purpose`, which the hook can't target, so the
 orchestrator passes `context.md` to those in-prompt instead.)
+
+`synthesis.md` reaches the orchestrator through a **`PostToolUse` hook**
+(`hooks/hooks.json` → `bin/inject-synthesis.py`): when the orchestrator reads
+`lib/synthesis.md`, the hook checks for `.claude/precheck/synthesis.md` and
+appends its contents as a follow-up attachment. The base synthesis rules always
+apply; per-project rules add to them (severity overrides, extra sections,
+suppressions).
 
 > All invocable scripts are Python 3.10+ stdlib (no `jq`, no `awk`). If `python3`
 > is missing, hook injection no-ops silently and reviewers fall back to reading
@@ -92,10 +100,11 @@ precheck/
 ├── commands/precheck-config.md  interactive setup/repair of .claude/precheck/
 ├── workflows/precheck.mjs    dynamic-workflow script (deterministic fan-out)
 ├── agents/precheck-*.md      six reviewer subagents (generic identities)   ← shared
-├── hooks/hooks.json          SubagentStart hook registration               ← shared
+├── hooks/hooks.json          hook registrations (SubagentStart + PostToolUse) ← shared
 ├── lib/synthesis.md          report merge/format spec (read at synthesis)  ← shared
 ├── bin/capture-diff.py       diff capture + semi-diff + .claude/precheck/ discovery + excludes ← shared
 ├── bin/inject-context.py     SubagentStart hook: injects .claude/precheck/ rules  ← shared
+├── bin/inject-synthesis.py   PostToolUse hook: appends .claude/precheck/synthesis.md ← shared
 ├── bin/config-doctor.py      inspects/validates .claude/precheck/ (used by /precheck-config)
 ├── examples/precheck/        copy-paste customization templates
 └── spike/                    dev-only: builds a sample repo to exercise both commands

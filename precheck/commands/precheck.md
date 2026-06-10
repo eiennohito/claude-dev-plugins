@@ -26,4 +26,4 @@ For each `config.custom` entry (if any): same call but `subagent_type: general-p
 
 ## Synthesize
 
-When all reviewers return, produce the report by following `${CLAUDE_PLUGIN_ROOT}/lib/synthesis.md`.
+When all reviewers return, use the **Read** tool to read `${CLAUDE_PLUGIN_ROOT}/lib/synthesis.md`, then produce the report following the synthesis spec and any project-specific rules that appear after it.

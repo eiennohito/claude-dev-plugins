@@ -77,6 +77,7 @@ def main():
         return os.path.isfile(os.path.join(pabs, name))
     print(f"config.json: {'present' if has('config.json') else 'absent'}")
     print(f"context.md:  {'present' if has('context.md') else 'absent'}")
+    print(f"synthesis.md:{'present' if has('synthesis.md') else 'absent'}")
     print(f"exclude:     {'present' if has('exclude') else 'absent'}")
     overrides = [d for d in KNOWN_DIMS if has(f"{d}.md")]
     print(f"overrides:   {', '.join(overrides) if overrides else 'none'}")
@@ -84,7 +85,7 @@ def main():
     if os.path.isdir(pabs):
         for fn in sorted(os.listdir(pabs)):
             base, ext = os.path.splitext(fn)
-            if ext == ".md" and base not in KNOWN_DIMS and base != "context":
+            if ext == ".md" and base not in KNOWN_DIMS and base not in ("context", "synthesis"):
                 stray.append(fn)
     if stray:
         print(f"unrecognized .md files: {', '.join(stray)}")
@@ -131,7 +132,8 @@ def main():
                 issues.append(f"unknown config key(s): {unknown_keys}. Known: {sorted(KNOWN_KEYS)}")
 
     # --- @-includes in the .md files ---
-    md_files = [("context.md", os.path.join(pabs, "context.md"))]
+    md_files = [("context.md", os.path.join(pabs, "context.md")),
+                ("synthesis.md", os.path.join(pabs, "synthesis.md"))]
     md_files += [(f"{d}.md", os.path.join(pabs, f"{d}.md")) for d in overrides]
     inc_lines = []
     for label, p in md_files:
