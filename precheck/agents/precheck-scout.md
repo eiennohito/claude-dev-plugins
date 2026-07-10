@@ -17,16 +17,16 @@ Your prompt carries:
 
 ## Protocol
 
-1. **Capture the diff.** Classify the input:
-   - If it looks like an existing file path or a git range (e.g. `main..HEAD`,
-     a SHA) → pass it as an argument to capture-diff.
-   - If it is free-form text (a focus hint / informal plan) or empty → run
-     capture-diff with no argument; keep the text as `plan` in your output.
+1. **Capture the diff.** Always pass the raw input to capture-diff — it handles
+   classification internally (file path vs git range vs free-form text):
    ```
-   python3 "<plugin-root>/bin/capture-diff.py" [file-or-range if applicable]
+   python3 "<plugin-root>/bin/capture-diff.py" <input>
    ```
+   If the input is empty, run it with no arguments.
    Parse the KEY=VALUE output. Key fields: `PROJECT_ROOT`, `DIFF_FILE`,
-   `DIFF_EMPTY`, `PLAN_FILE`, `PRECHECK_DIR`.
+   `DIFF_EMPTY`, `PLAN_FILE`, `FOCUS`, `PRECHECK_DIR`.
+   If `PLAN_FILE` is present, use it as the `plan` field.
+   If `FOCUS` is present, use it as the `plan` field instead.
 
 2. **If `DIFF_EMPTY=1`**, return `{ "empty": true }` immediately.
 

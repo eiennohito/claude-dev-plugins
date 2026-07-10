@@ -12,11 +12,16 @@ Deterministic fan-out via a workflow: you run the workflow, and report the struc
 
 ## Step 1 — Launch workflow
 
+Before calling Workflow, write a **one-sentence summary** of the task you were
+working on this session (the feature, fix, or refactor — not the diff contents).
+If the session just started and you have no task context, leave `context` empty.
+
 Call the **Workflow** tool with:
 - `scriptPath`: `${CLAUDE_PLUGIN_ROOT}/workflows/precheck.mjs`
 - `args` (a real JSON object, not a string):
   - `input`      ← `$ARGUMENTS` (verbatim user input — may be a plan file path, git range, focus description, or empty)
   - `pluginRoot` ← `${CLAUDE_PLUGIN_ROOT}`
+  - `context`    ← your one-sentence task summary (or `""` if none)
 
 ## Step 2 — Prepare for synthesis
 

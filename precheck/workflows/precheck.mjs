@@ -7,9 +7,10 @@ export const meta = {
   ],
 }
 
-// args: { input: string, pluginRoot: string }
+// args: { input: string, pluginRoot: string, context: string }
 // input is the user's raw argument (plan file, git range, focus description, or empty).
 // pluginRoot is the absolute path to the precheck plugin directory.
+// context is the orchestrator's one-sentence summary of the current task (may be empty).
 let a = {}
 try {
   a = typeof args === 'string' ? JSON.parse(args) : (args || {})
@@ -18,6 +19,7 @@ try {
 }
 const input = a.input || ''
 const pluginRoot = a.pluginRoot || ''
+const taskContext = a.context || ''
 
 const SCOUT = {
   type: 'object',
@@ -66,7 +68,7 @@ phase('Scout')
 
 const scout = await agent(
   `Input: ${input}\nPlugin root: ${pluginRoot}`,
-  { agentType: 'precheck:precheck-scout', model: 'haiku', schema: SCOUT, phase: 'Scout', label: 'scout' }
+  { agentType: 'precheck:precheck-scout', model: 'haiku', effort: 'low', schema: SCOUT, phase: 'Scout', label: 'scout' }
 )
 
 if (!scout || scout.empty) {
@@ -86,7 +88,9 @@ try { cfg = JSON.parse(scout.config || '{}') } catch (_) {}
 // slots early. docs reliably runs longest; the tail is a heuristic.
 const ALL   = ['docs', 'reusability', 'plan-coverage', 'quality', 'security', 'efficiency']
 const dims  = (Array.isArray(cfg.dimensions) && cfg.dimensions.length) ? cfg.dimensions : ALL
-const model = cfg.model || 'sonnet'
+const model    = cfg.model || 'sonnet'
+const effortOf = (typeof cfg.effort === 'object' && cfg.effort) || {}
+
 
 function ctx(extra) {
   return [
@@ -94,6 +98,7 @@ function ctx(extra) {
     `PROJECT_ROOT: ${projectRoot}`,
     summary ? `Diff summary: ${summary}` : '',
     files.length ? `Changed files:\n${files.map((f) => '  ' + f).join('\n')}` : '',
+    taskContext ? `Task context: ${taskContext}` : '',
     extra || '',
     'Project context and per-dimension rules are injected into your context automatically. Return findings via the structured schema.',
   ].filter(Boolean).join('\n')
@@ -107,7 +112,7 @@ phase('Review')
 const builtins = dims.map((d) => () =>
   agent(
     ctx(d === 'plan-coverage' && plan ? `Plan / focus: ${plan}` : ''),
-    { agentType: `precheck:precheck-${d}`, model, schema: FINDINGS, phase: 'Review', label: `review:${d}` }
+    { agentType: `precheck:precheck-${d}`, model, effort: effortOf[d], schema: FINDINGS, phase: 'Review', label: `review:${d}` }
   )
 )
 
@@ -115,7 +120,7 @@ const customDefs = Array.isArray(cfg.custom) ? cfg.custom : []
 const customs = customDefs.map((c) => () =>
   agent(
     `${c.instructions}\n\n${ctx('')}`,
-    { agentType: 'general-purpose', model, schema: FINDINGS, phase: 'Review', label: `review:${c.name || 'custom'}` }
+    { agentType: 'general-purpose', model, effort: effortOf[c.name], schema: FINDINGS, phase: 'Review', label: `review:${c.name || 'custom'}` }
   )
 )
 
@@ -143,9 +148,10 @@ const codexRuns = codexEntries
         `PROJECT_ROOT: ${projectRoot}`,
         summary ? `Diff summary: ${summary}` : '',
         files.length ? `Changed files:\n${files.map((f) => '  ' + f).join('\n')}` : '',
+        taskContext ? `Task context: ${taskContext}` : '',
         plan ? `Plan / focus: ${plan}` : '',
       ].filter(Boolean).join('\n'),
-      { agentType: 'precheck:codex-runner', model: 'haiku', schema: FINDINGS, phase: 'Review', label: `review:${name}(codex)` }
+      { agentType: 'precheck:codex-runner', model: 'haiku', effort: effortOf[name], schema: FINDINGS, phase: 'Review', label: `review:${name}(codex)` }
     ),
   }))
 

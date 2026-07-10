@@ -18,9 +18,13 @@ python3 "${CLAUDE_PLUGIN_ROOT}/bin/capture-diff.py" $ARGUMENTS
 
 The block above gives you `PROJECT_ROOT`, `DIFF_FILE` (the semi-diff path — pass it to agents, never inline its contents), the diff summary, the changed-file list, any `CONTEXT_FILE` / `PLAN_FILE` paths, and inlined `.claude/precheck/config.json` (if present). If `DIFF_EMPTY=1`, tell the user there's nothing to review and stop.
 
+## Task context
+
+Before spawning reviewers, write a **one-sentence summary** of the task you were working on this session (the feature, fix, or refactor — not the diff contents). If the session just started and you have no task context, skip this.
+
 ## Spawn reviewers — single message, concurrent
 
-Run the configured reviewers (config `dimensions`; default all six, longest-first so the slowest claim slots first: `docs reusability plan-coverage quality security efficiency`). For each, call the Agent tool with `subagent_type: precheck-<dim>`, `model` from config (default `sonnet`), and a prompt containing **only**: `DIFF_FILE`, the diff summary, the changed-file list, `PROJECT_ROOT`, and the `$ARGUMENTS`/`PLAN_FILE` scope. Project `.claude/precheck/` context and per-dimension rules are injected into each built-in reviewer automatically by a SubagentStart hook — do **not** pass them. Reviewer identities live in the subagent definitions — don't restate them.
+Run the configured reviewers (config `dimensions`; default all six, longest-first so the slowest claim slots first: `docs reusability plan-coverage quality security efficiency`). For each, call the Agent tool with `subagent_type: precheck-<dim>`, `model` from config (default `sonnet`), and a prompt containing **only**: `DIFF_FILE`, the diff summary, the changed-file list, `PROJECT_ROOT`, the `$ARGUMENTS`/`PLAN_FILE` scope, and your task-context summary (if any, as `Task context: <summary>`). Project `.claude/precheck/` context and per-dimension rules are injected into each built-in reviewer automatically by a SubagentStart hook — do **not** pass them. Reviewer identities live in the subagent definitions — don't restate them.
 
 For each `config.custom` entry (if any): same call but `subagent_type: general-purpose`, prompt = its `instructions` + the same context + `CONTEXT_FILE` (if any — the hook does not reach custom reviewers, so pass the path here) + this contract: *read the semi-diff at `DIFF_FILE` (removed lines carry content; added lines are ranges — read source for context); return findings only as `[SEVERITY] file:line — symptom`, a one-line diagnosis, and a `→` direction; severities CRITICAL/HIGH/MEDIUM/LOW.*
 

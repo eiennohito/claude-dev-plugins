@@ -10,10 +10,11 @@ Emits machine-readable KEY=value lines plus the changed-file list and diff stat;
 the slash command pre-runs this in a ```! block, so its output is injected into
 the prompt without any "run this then parse it" prose.
 
-Usage: capture-diff.py [plan-file | git-range]
+Usage: capture-diff.py [plan-file | git-range | free-text ...]
   - no arg          -> working-tree diff (staged + unstaged + untracked) vs HEAD
   - existing file   -> treated as a plan file; still diffs the working tree
-  - anything else   -> treated as a git range (e.g. main..HEAD, a SHA)
+  - valid git ref   -> treated as a git range (validated via git rev-parse)
+  - anything else   -> treated as free-form focus text; diffs the working tree
 
 Customization (all optional), under $PRECHECK_DIR (default .claude/precheck):
   config.json   -> orchestrator knobs (inlined below for the command to read)
@@ -133,14 +134,22 @@ def semi_diff(diff_text):
     return ("\n".join(out) + "\n") if out else ""
 
 
+def is_git_range(arg):
+    """Check if arg is a valid git revision or range (e.g. SHA, branch, main..HEAD)."""
+    r = subprocess.run(["git", "rev-parse", arg], capture_output=True, text=True)
+    return r.returncode == 0
+
+
 def main():
-    arg = sys.argv[1] if len(sys.argv) > 1 else ""
-    rng = plan = ""
+    arg = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else ""
+    rng = plan = focus = ""
     if arg:
         if os.path.isfile(arg):
-            plan = arg          # plan file -> review the working tree, note the plan
+            plan = arg
+        elif is_git_range(arg):
+            rng = arg
         else:
-            rng = arg           # treat as a git range
+            focus = arg         # free-form text (plan description, focus hint)
 
     precheck_dir = os.environ.get("PRECHECK_DIR", ".claude/precheck")
 
@@ -185,6 +194,8 @@ def main():
     ]
     if plan:
         out.append(f"PLAN_FILE={plan}")
+    if focus:
+        out.append(f"FOCUS={focus}")
     if rng:
         out.append(f"RANGE={rng}")
     if lines == 0:
