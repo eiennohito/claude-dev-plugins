@@ -56,11 +56,11 @@ After writing, re-run the doctor to confirm a clean result:
 python3 "${CLAUDE_PLUGIN_ROOT}/bin/config-doctor.py"
 ```
 
-Then summarize what you created/changed in 2–3 lines, and remind the user that `.claude/precheck/` is read automatically by `/precheck` and `/precheck-wf` (per-dimension rules via the SubagentStart hook). Note that `.claude/precheck/` is itself excluded from review.
+Then summarize what you created/changed in 2–3 lines, and remind the user that `.claude/precheck/` is read automatically by `/precheck` (per-dimension rules via the SubagentStart hook). Note that `.claude/precheck/` is itself excluded from review.
 
 ## Reference — plugin README
 
-Consult this for anything not covered above (how customization is consumed, the two orchestrators, the `@`-include rules):
+Consult this for anything not covered above (how customization is consumed, the `@`-include rules):
 
 ```!
 cat "${CLAUDE_PLUGIN_ROOT}/README.md"

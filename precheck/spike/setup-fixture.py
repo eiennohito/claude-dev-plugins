@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build a throwaway git repo with realistic, reviewable changes for exercising
-BOTH precheck commands (/precheck and /precheck-wf) side by side.
+/precheck.
 
 The working tree is left with a staged + unstaged + untracked + deleted mix, and
 the changes are seeded so every reviewer dimension has something real to find:
@@ -156,11 +156,10 @@ def main():
     print("  unstaged:  app/orders.py (SQL injection + N+1), deps.lock (excluded), app/legacy.py (deleted)")
     print("  untracked: app/discounts.py (dup logic + hardcoded secret)")
     print()
-    print("run BOTH and compare:")
+    print("run precheck:")
     print(f"  cd {d}")
     print(f"  claude --plugin-dir {PLUGIN}")
-    print("  /precheck            # prose orchestrator")
-    print("  /precheck-wf         # workflow orchestrator")
+    print("  /precheck")
     print("  /precheck docs/plans/checkout.md   # (optional) point plan-coverage at the plan")
 
 

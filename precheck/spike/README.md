@@ -1,8 +1,8 @@
 # precheck testbed (dev only)
 
 `setup-fixture.py` builds a throwaway git repo whose working tree is seeded so
-**every reviewer dimension has something real to find** — use it to exercise and
-compare both commands (`/precheck` and `/precheck-wf`).
+**every reviewer dimension has something real to find** — use it to exercise
+`/precheck`.
 
 ## Build it
 
@@ -12,8 +12,8 @@ python3 spike/setup-fixture.py
 cd /tmp/precheck-testbed
 claude --plugin-dir "$(cd - && pwd)"
 #   then, in the session:
-/precheck            # prose orchestrator
-/precheck-wf         # workflow orchestrator
+/precheck
+/precheck docs/plans/checkout.md   # point plan-coverage at the plan
 ```
 
 Add `--debug hooks` to the `claude` invocation to watch the `SubagentStart` hook
@@ -38,10 +38,3 @@ The working tree is a deliberate mix: **staged** (`users.py`), **unstaged**
 
 `.claude/precheck/` ships `context.md`, a `security.md` rule, a custom `naming` reviewer,
 and an `exclude` — exercising the customization + hook-injection path end to end.
-
-## Comparing the two runs
-
-Both should surface the same core findings; what you're comparing is the
-*orchestration*: does `/precheck-wf` reliably fan out all dimensions and return
-clean structured findings, and does `/precheck`'s prose path match it? Note any
-divergence in coverage, dedup quality, or the final report.

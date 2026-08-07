@@ -7,11 +7,11 @@ report. Language-agnostic out of the box; customizable per-project.
 ## How it works
 
 ```
-/precheck [plan-file | git-range]
+/precheck [plan-file | git-range | focus]
         │
         ├─ bin/capture-diff.py   → writes a compact "semi-diff" to /tmp, leaves
         │                          git staging untouched, discovers .claude/precheck/
-        ├─ spawns reviewers (Agent tool, concurrent):
+        ├─ workflows/precheck.mjs  deterministic parallel() fan-out:
         │     docs · reusability · plan-coverage · quality · security · efficiency
         │     (+ any custom reviewers you configure)
         └─ orchestrator merges, dedupes, deepens, and ranks findings
@@ -95,40 +95,29 @@ mkdir -p .claude && cp -r "<plugin>/examples/precheck" .claude/precheck
 
 ```
 precheck/
-├── commands/precheck.md      orchestrator A — prose/slash-command (the /precheck command)
-├── commands/precheck-wf.md   orchestrator B — workflow variant (the /precheck-wf command)
+├── commands/precheck.md      /precheck command (launches the workflow)
 ├── commands/precheck-config.md  interactive setup/repair of .claude/precheck/
 ├── workflows/precheck.mjs    dynamic-workflow script (deterministic fan-out)
-├── agents/precheck-*.md      built-in reviewer subagents (generic identities)   ← shared
-├── hooks/hooks.json          hook registrations (SubagentStart + PostToolUse) ← shared
-├── lib/synthesis.md          report merge/format spec (read at synthesis)  ← shared
-├── bin/capture-diff.py       diff capture + semi-diff + .claude/precheck/ discovery + excludes ← shared
-├── bin/inject-context.py     SubagentStart hook: injects .claude/precheck/ rules  ← shared
-├── bin/inject-synthesis.py   PostToolUse hook: appends .claude/precheck/synthesis.md ← shared
+├── agents/precheck-*.md      built-in reviewer subagents (generic identities)
+├── hooks/hooks.json          hook registrations (SubagentStart + PostToolUse)
+├── lib/synthesis.md          report merge/format spec (read at synthesis)
+├── bin/capture-diff.py       diff capture + semi-diff + .claude/precheck/ discovery + excludes
+├── bin/inject-context.py     SubagentStart hook: injects .claude/precheck/ rules
+├── bin/inject-synthesis.py   PostToolUse hook: appends .claude/precheck/synthesis.md
 ├── bin/config-doctor.py      inspects/validates .claude/precheck/ (used by /precheck-config)
 ├── examples/precheck/        copy-paste customization templates
-└── spike/                    dev-only: builds a sample repo to exercise both commands
+└── spike/                    dev-only: builds a sample repo to exercise /precheck
 ```
 
-## Two orchestrators, one engine
+## Architecture
 
-The reviewers, the hook, the capture, and synthesis are shared. Only the orchestration layer differs:
+`/precheck` launches a deterministic workflow (`workflows/precheck.mjs`) that fans
+out reviewers via `parallel()`. Each reviewer is a tool-restricted subagent
+(`agentType: 'precheck:precheck-<dim>'`) that returns structured findings via a
+schema. The workflow returns those findings to the main session, which merges and
+ranks them following `lib/synthesis.md`.
 
-| | `/precheck` (A) | `/precheck-wf` (B) |
-|---|---|---|
-| Fan-out | main agent reads prose, spawns reviewers | `parallel()` in `workflows/precheck.mjs` |
-| Determinism | model-driven | deterministic |
-| Findings | collected from text output | structured (schema) → JS-tagged |
-| Portability | runs anywhere | needs the **Workflow** feature (research preview, Claude Code ≥ 2.1.154) |
-| Reviewers | `subagent_type: precheck-<dim>` | `agentType: 'precheck:precheck-<dim>'` |
-
-Both leave git staging untouched, both auto-inject `.claude/precheck/` rules via the
-SubagentStart hook (verified inside a workflow during development), and both hand
-off to `lib/synthesis.md` for the final report. Keep both while comparing; drop one
-once you've picked. `spike/setup-fixture.py` builds a sample repo seeded for every
-dimension so you can A/B them.
-
-The command body stays tiny because it pre-runs the capture script with a
-` ```! ` block — the diff summary, file list, discovered `.claude/precheck/` paths, and
-inlined `config.json` are injected into the prompt at invocation, so there's no
-"run this, then parse the output" prose for the orchestrator to follow.
+The command body stays tiny: a ` ```! ` block pre-runs the capture script so the
+diff summary, file lists, discovered `.claude/precheck/` paths, and inlined
+`config.json` are injected into the prompt at invocation. The orchestrator just
+calls the Workflow tool and synthesizes the result.

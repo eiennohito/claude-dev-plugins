@@ -1,33 +1,39 @@
 ---
 name: precheck
-description: Parallel code review before commit. Spawns reviewer subagents over the current diff (reusability, security, quality, efficiency, plan coverage, doc sync), then synthesizes a severity-ranked report. Customizable per-project via .claude/precheck/.
-argument-hint: "[plan-file or git-range]"
-allowed-tools: "Bash Read Agent"
+description: Parallel pre-commit review via a dynamic workflow (deterministic fan-out). Spawns reviewer subagents over the current diff (reusability, security, quality, efficiency, plan coverage, doc sync), then synthesizes a severity-ranked report. Customizable per-project via .claude/precheck/.
+argument-hint: "[plan-file, git-range, or focus description]"
+allowed-tools: "Read Workflow"
 disable-model-invocation: true
 ---
 
 # Precheck — parallel code review
 
-You orchestrate only: the review context is captured below; you spawn the reviewers and merge their reports. **You do not review code yourself.**
+Deterministic fan-out via a workflow: you run the workflow, and report the structured findings it returns. **You do not review code yourself.**
 
-## Captured context
+## Step 1 — Launch workflow
 
-```!
-python3 "${CLAUDE_PLUGIN_ROOT}/bin/capture-diff.py" $ARGUMENTS
-```
+Before calling Workflow, write a **one-sentence summary** of the task you were
+working on this session (the feature, fix, or refactor — not the diff contents).
+If the session just started and you have no task context, leave `context` empty.
 
-The block above gives you `PROJECT_ROOT`, `DIFF_FILE` (the semi-diff path — pass it to agents, never inline its contents), the diff summary, the changed-file list, any `CONTEXT_FILE` / `PLAN_FILE` paths, and inlined `.claude/precheck/config.json` (if present). If `DIFF_EMPTY=1`, tell the user there's nothing to review and stop.
+Call the **Workflow** tool with:
+- `scriptPath`: `${CLAUDE_PLUGIN_ROOT}/workflows/precheck.mjs`
+- `args` (a real JSON object, not a string):
+  - `input`      ← `$ARGUMENTS` (verbatim user input — may be a plan file path, git range, focus description, or empty)
+  - `pluginRoot` ← `${CLAUDE_PLUGIN_ROOT}`
+  - `context`    ← your one-sentence task summary (or `""` if none)
 
-## Task context
+## Step 2 — Prepare for synthesis
 
-Before spawning reviewers, write a **one-sentence summary** of the task you were working on this session (the feature, fix, or refactor — not the diff contents). If the session just started and you have no task context, skip this.
+After the Workflow call returns, use the **Read** tool to read `${CLAUDE_PLUGIN_ROOT}/lib/synthesis.md` (unless you already have it this session). Follow the synthesis spec and any project-specific rules that appear after it. Then state:
 
-## Spawn reviewers — single message, concurrent
+> Precheck workflow launched (task **XXXXX**). I will produce the report once it completes.
 
-Run the configured reviewers (config `dimensions`; default all six, longest-first so the slowest claim slots first: `docs reusability plan-coverage quality security efficiency`). For each, call the Agent tool with `subagent_type: precheck-<dim>`, `model` from config (default `sonnet`), and a prompt containing **only**: `DIFF_FILE`, the diff summary, the changed-file list, `PROJECT_ROOT`, the `$ARGUMENTS`/`PLAN_FILE` scope, and your task-context summary (if any, as `Task context: <summary>`). Project `.claude/precheck/` context and per-dimension rules are injected into each built-in reviewer automatically by a SubagentStart hook — do **not** pass them. Reviewer identities live in the subagent definitions — don't restate them.
+Use the real Task ID from the Workflow tool result. Then stop. Event will come in time. Do not worry.
 
-For each `config.custom` entry (if any): same call but `subagent_type: general-purpose`, prompt = its `instructions` + the same context + `CONTEXT_FILE` (if any — the hook does not reach custom reviewers, so pass the path here) + this contract: *read the semi-diff at `DIFF_FILE` (removed lines carry content; added lines are ranges — read source for context); return findings only as `[SEVERITY] file:line — symptom`, a one-line diagnosis, and a `→` direction; severities CRITICAL/HIGH/MEDIUM/LOW.*
+## Step 3 — Synthesize when notified
 
-## Synthesize
+When a `<task-notification>` arrives whose `<task-id>` matches the Task ID from Step 1 and whose `<status>` is `completed`:
 
-When all reviewers return, use the **Read** tool to read `${CLAUDE_PLUGIN_ROOT}/lib/synthesis.md`, then produce the report following the synthesis spec and any project-specific rules that appear after it.
+- If the result has `"empty": true`, tell the user there is nothing to review and stop.
+- Otherwise, synthesize the report from its `findings` array following the synthesis format. Note any `dimensionsFailed` in one line.
