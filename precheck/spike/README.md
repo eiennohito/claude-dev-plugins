@@ -7,9 +7,10 @@ compare both commands (`/precheck` and `/precheck-wf`).
 ## Build it
 
 ```bash
-python3 /Users/hdymacuser/work/misc/claude-precheck/precheck/spike/setup-fixture.py
+# run from the precheck plugin root
+python3 spike/setup-fixture.py
 cd /tmp/precheck-testbed
-claude --plugin-dir /Users/hdymacuser/work/misc/claude-precheck/precheck
+claude --plugin-dir "$(cd - && pwd)"
 #   then, in the session:
 /precheck            # prose orchestrator
 /precheck-wf         # workflow orchestrator

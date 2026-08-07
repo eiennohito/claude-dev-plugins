@@ -39,7 +39,7 @@ Design notes:
 ## Customization — `.claude/precheck/`
 
 Per-repo config lives in `.claude/precheck/`. Everything is optional; with no
-`.claude/precheck/`, precheck runs all six reviewers with generic rules.
+`.claude/precheck/`, precheck runs all built-in reviewers with generic rules.
 
 **Easiest setup:** run **`/precheck-config`** — it inspects the repo, drafts a
 `context.md` from the detected stack, walks you through dimensions / model / custom
@@ -79,7 +79,7 @@ suppressions).
 > `.claude/precheck/` files themselves.
 
 `config.json` knobs:
-- `dimensions` — subset/order of built-ins to run. Default: all six.
+- `dimensions` — subset/order of built-ins to run. Default: all built-ins.
 - `model` — model for reviewers. Default: `sonnet`.
 - `custom` — array of `{ name, instructions }` extra reviewers run as general-purpose agents.
 
@@ -99,7 +99,7 @@ precheck/
 ├── commands/precheck-wf.md   orchestrator B — workflow variant (the /precheck-wf command)
 ├── commands/precheck-config.md  interactive setup/repair of .claude/precheck/
 ├── workflows/precheck.mjs    dynamic-workflow script (deterministic fan-out)
-├── agents/precheck-*.md      six reviewer subagents (generic identities)   ← shared
+├── agents/precheck-*.md      built-in reviewer subagents (generic identities)   ← shared
 ├── hooks/hooks.json          hook registrations (SubagentStart + PostToolUse) ← shared
 ├── lib/synthesis.md          report merge/format spec (read at synthesis)  ← shared
 ├── bin/capture-diff.py       diff capture + semi-diff + .claude/precheck/ discovery + excludes ← shared
