@@ -2,7 +2,7 @@
 name: precheck
 description: Parallel pre-commit review via a dynamic workflow (deterministic fan-out). Spawns reviewer subagents over the current diff (reusability, security, quality, efficiency, plan coverage, doc sync), then synthesizes a severity-ranked report. Customizable per-project via .claude/precheck/.
 argument-hint: "[plan-file, git-range, or focus description]"
-allowed-tools: "Read Workflow"
+allowed-tools: "Read Read(/${CLAUDE_PLUGIN_ROOT}/**) Workflow"
 disable-model-invocation: true
 ---
 

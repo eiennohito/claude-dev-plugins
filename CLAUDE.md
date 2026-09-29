@@ -184,8 +184,17 @@ every turn**. Internalize this model:
 
 - **You can "bundle" a workflow in a plugin** by shipping the script and invoking
   it from a command via `Workflow({scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/x.mjs", args})`.
-  *Reason: workflows aren't a plugin manifest component, but `scriptPath` accepts any
-  path, and a command instructing the agent to call Workflow is a valid opt-in.*
+  *Reason: workflows aren't a plugin manifest component, and a command instructing
+  the agent to call Workflow is a valid opt-in.*
+- **`scriptPath` must pass a Read-permission check** (working dir, added dir, or a
+  path-scoped Read allow rule), so the command needs
+  `allowed-tools: "Read(/${CLAUDE_PLUGIN_ROOT}/**) Workflow"`. Note the extra `/`:
+  `//abs/path` is an absolute rule, while a single `/` is relative to the settings
+  root. *Reason: verified by spike on 2.1.284. A bare `Read` allow doesn't satisfy
+  the check, copying the script to `/tmp` fails the same way, and without the rule
+  the command breaks in every project except the plugin's own repo. `${CLAUDE_PLUGIN_ROOT}`
+  expanding inside frontmatter is undocumented; it works on 2.1.284, so if an update
+  brings the error back, check that first.*
 - **The scripting API is undocumented publicly — the Workflow tool's own description
   is the spec.** *Reason: there's no reference page; reverse-engineer from the tool
   description and the bundled `/deep-research` script.*
