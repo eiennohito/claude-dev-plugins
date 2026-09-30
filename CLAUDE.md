@@ -296,3 +296,6 @@ every turn**. Internalize this model:
   *Reason: deterministic diagnostics (valid JSON, known dimensions, resolvable
   includes) are more reliable than asking the model to eyeball config, and give
   repair-mode a concrete checklist.*
+- **Commit directly to `main`; don't create branches.** *Reason (user correction):
+  small single-maintainer project with no CI or PR flow, so a branch adds a merge
+  step and nothing else.*
