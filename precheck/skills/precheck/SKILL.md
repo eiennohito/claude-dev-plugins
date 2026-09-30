@@ -2,7 +2,7 @@
 name: precheck
 description: Parallel pre-commit review via a dynamic workflow (deterministic fan-out). Spawns reviewer subagents over the current diff (reusability, security, quality, efficiency, plan coverage, doc sync), then synthesizes a severity-ranked report. Customizable per-project via .claude/precheck/.
 argument-hint: "[plan-file, git-range, or focus description]"
-allowed-tools: "Read Read(/${CLAUDE_PLUGIN_ROOT}/**) Workflow"
+allowed-tools: "Read Workflow"
 disable-model-invocation: true
 ---
 
@@ -17,7 +17,7 @@ working on this session (the feature, fix, or refactor — not the diff contents
 If the session just started and you have no task context, leave `context` empty.
 
 Call the **Workflow** tool with:
-- `scriptPath`: `${CLAUDE_PLUGIN_ROOT}/workflows/precheck.mjs`
+- `name`: `precheck:review`
 - `args` (a real JSON object, not a string):
   - `input`      ← `$ARGUMENTS` (verbatim user input — may be a plan file path, git range, focus description, or empty)
   - `pluginRoot` ← `${CLAUDE_PLUGIN_ROOT}`

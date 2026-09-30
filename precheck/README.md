@@ -11,7 +11,7 @@ report. Language-agnostic out of the box; customizable per-project.
         │
         ├─ bin/capture-diff.py   → writes a compact "semi-diff" to /tmp, leaves
         │                          git staging untouched, discovers .claude/precheck/
-        ├─ workflows/precheck.mjs  deterministic parallel() fan-out:
+        ├─ workflows/review.js   deterministic parallel() fan-out:
         │     docs · reusability · plan-coverage · quality · security · efficiency
         │     (+ any custom reviewers you configure)
         └─ orchestrator merges, dedupes, deepens, and ranks findings
@@ -95,9 +95,9 @@ mkdir -p .claude && cp -r "<plugin>/examples/precheck" .claude/precheck
 
 ```
 precheck/
-├── commands/precheck.md      /precheck command (launches the workflow)
-├── commands/precheck-config.md  interactive setup/repair of .claude/precheck/
-├── workflows/precheck.mjs    dynamic-workflow script (deterministic fan-out)
+├── skills/precheck/          /precheck skill (launches the workflow)
+├── skills/precheck-config/   /precheck-config: interactive setup/repair of .claude/precheck/
+├── workflows/review.js       bundled workflow `precheck:review` (deterministic fan-out)
 ├── agents/precheck-*.md      built-in reviewer subagents (generic identities)
 ├── hooks/hooks.json          hook registrations (SubagentStart + PostToolUse)
 ├── lib/synthesis.md          report merge/format spec (read at synthesis)
@@ -111,7 +111,7 @@ precheck/
 
 ## Architecture
 
-`/precheck` launches a deterministic workflow (`workflows/precheck.mjs`) that fans
+`/precheck` launches the bundled workflow `precheck:review` (`workflows/review.js`) that fans
 out reviewers via `parallel()`. Each reviewer is a tool-restricted subagent
 (`agentType: 'precheck:precheck-<dim>'`) that returns structured findings via a
 schema. The workflow returns those findings to the main session, which merges and

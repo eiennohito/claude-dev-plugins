@@ -79,7 +79,7 @@ every turn**. Internalize this model:
 ## Plugins: structure & mechanics
 
 - **A plugin is a directory with `.claude-plugin/plugin.json` plus component dirs**
-  (`commands/`, `agents/`, `hooks/hooks.json`, `workflows/`, `bin/`, `lib/`,
+  (`skills/`, `agents/`, `hooks/hooks.json`, `workflows/`, `bin/`, `lib/`,
   `examples/`). *Reason: components are discovered by convention; `plugin.json` is
   the only required file.*
 - **Plugin agents/commands are namespaced `plugin:name`** — e.g. a workflow spawns
@@ -87,9 +87,9 @@ every turn**. Internalize this model:
   *Reason: verified empirically — the bare name fails with "agent type not found"
   and the engine lists only the `plugin:agent` forms. The redundant `precheck:precheck-`
   is just because the agent is named `precheck-security` inside the `precheck` plugin.*
-- **`${CLAUDE_PLUGIN_ROOT}`** is available in command bodies, hooks, and `!` blocks
+- **`${CLAUDE_PLUGIN_ROOT}`** is available in skill bodies, hooks, and `!` blocks
   to reference bundled files. **`${CLAUDE_PROJECT_DIR}`** points at the user's repo
-  (documented for hooks; works in command `!` blocks but is undocumented there).
+  (documented for both; see [skills § string substitutions](https://code.claude.com/docs/en/skills#available-string-substitutions)).
   *Reason: a plugin's files live outside the user's project, so plugin-relative
   paths need `CLAUDE_PLUGIN_ROOT`; project-relative work needs `CLAUDE_PROJECT_DIR`
   or `git rev-parse --show-toplevel` (the most portable).*
@@ -98,9 +98,16 @@ every turn**. Internalize this model:
   use a `` ```! cat "${CLAUDE_PLUGIN_ROOT}/..." `` `` block, not `@`. *Reason: `@`
   has no way to reach `CLAUDE_PLUGIN_ROOT`; `!`-injection works regardless of
   whether commands even support `@`.*
-- **Slash commands and skills are the right home for explicit `/command` UX with
-  `$ARGUMENTS`; skills are model-invoked.** *Reason: match the invocation model to
-  the trigger — don't make something a skill if the user types it as `/x`.*
+- **Ship user-typed `/x` entry points as skills (`skills/<name>/SKILL.md`) with
+  `disable-model-invocation: true`, not `commands/`.** *Reason: commands were merged
+  into skills; `commands/` still loads but the docs say to prefer `skills/` for new
+  plugins. The flag keeps the skill out of Claude's own invocation, matching a
+  command's user-only trigger.*
+- **Agents can't be hidden or made plugin-local** (checked on 2.1.285: there's no
+  frontmatter field for it; `disable-model-invocation` is ignored on agents). Every
+  plugin agent appears in the Agent tool listing of every session. *Reason: set
+  `description` to something minimal (precheck uses `No`) so an internal reviewer
+  costs a few listing tokens and doesn't attract general delegation.*
 - **Command/skill instructions must be oblivious to plugin internals.** The session
   agent doesn't know about hooks, injection mechanisms, or plugin architecture.
   Tell it *what to do* ("use the Read tool to read X"), not *why* ("this triggers a
@@ -182,22 +189,33 @@ every turn**. Internalize this model:
 
 ## Dynamic workflows
 
-- **You can "bundle" a workflow in a plugin** by shipping the script and invoking
-  it from a command via `Workflow({scriptPath: "${CLAUDE_PLUGIN_ROOT}/workflows/x.mjs", args})`.
-  *Reason: workflows aren't a plugin manifest component, and a command instructing
-  the agent to call Workflow is a valid opt-in.*
-- **`scriptPath` must pass a Read-permission check** (working dir, added dir, or a
-  path-scoped Read allow rule), so the command needs
-  `allowed-tools: "Read(/${CLAUDE_PLUGIN_ROOT}/**) Workflow"`. Note the extra `/`:
-  `//abs/path` is an absolute rule, while a single `/` is relative to the settings
-  root. *Reason: verified by spike on 2.1.284. A bare `Read` allow doesn't satisfy
-  the check, copying the script to `/tmp` fails the same way, and without the rule
-  the command breaks in every project except the plugin's own repo. `${CLAUDE_PLUGIN_ROOT}`
-  expanding inside frontmatter is undocumented; it works on 2.1.284, so if an update
-  brings the error back, check that first.*
-- **The scripting API is undocumented publicly — the Workflow tool's own description
-  is the spec.** *Reason: there's no reference page; reverse-engineer from the tool
-  description and the bundled `/deep-research` script.*
+- **Bundle workflows as a plugin component: `workflows/*.js`** (or the `workflows`
+  manifest field), each registered as `<plugin>:<meta.name>`. A skill launches one
+  with `Workflow({name: "precheck:review", args})` and `allowed-tools: "Workflow"`.
+  *Reason: officially supported
+  ([docs](https://code.claude.com/docs/en/workflows#distribute-a-workflow-in-a-plugin)),
+  and verified by spike on 2.1.285 from a cwd outside the plugin: `name` resolves and
+  `args` arrives as an object with no Read rule, unlike `scriptPath`, which needs
+  `Read(/${CLAUDE_PLUGIN_ROOT}/**)` to pass its Read-permission check. The docs list
+  only `.js`; don't rely on `.mjs` being discovered.*
+- **Never give a bundled workflow the same `meta.name` as a skill or command in the plugin.**
+  The workflow shadows the command: `/p:x` launches the workflow directly, skipping
+  the command body. *Reason: verified by spike; the command's prelude and
+  `allowed-tools` silently stop applying.*
+- **A bundled workflow is also user-invocable as `/<plugin>:<name>`,** without the
+  args its command supplies. Guard on a required arg and return an error pointing
+  at the command. *Reason: otherwise a direct run proceeds with blank args and fails
+  in confusing ways downstream.*
+- **`allowed-tools` is the only frontmatter field with `${…}` expansion.** Command
+  and skill bodies expand at invocation (before `` ```! `` blocks run); `allowed-tools`
+  and agent bodies expand at plugin load; agent `tools` never expands. *Reason: read
+  from the 2.1.285 source; the docs don't state timing, and a variable placed in any
+  other field silently stays literal.*
+- **The scripting API is documented in
+  [workflows](https://code.claude.com/docs/en/workflows)** (`agent`, `pipeline`,
+  `parallel`, `phase`, `log`, `args`, limits) and in the bundled `/workflow-authoring`
+  skill. *Reason: check these before reverse-engineering. `agent()` resolves to
+  `null` on stop/API error, so filter results.*
 - **Workflow scripts are pure coordination: no filesystem, shell, network, or
   `require`.** Do all I/O in the agents (or before launch, passing data via `args`).
   *Reason: the sandbox forbids it; e.g. diff capture must run in the command's `!`

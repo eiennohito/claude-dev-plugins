@@ -1,6 +1,6 @@
 export const meta = {
-  name: 'precheck',
-  description: 'Parallel pre-commit code review: scout the environment, then fan reviewer subagents over the diff and return structured findings.',
+  name: 'review',
+  description: 'Internal to /precheck (run that instead): scout the environment, then fan reviewer subagents over the diff and return structured findings.',
   phases: [
     { title: 'Scout', detail: 'Capture diff, read config, check codex' },
     { title: 'Review' },
@@ -20,6 +20,12 @@ try {
 const input = a.input || ''
 const pluginRoot = a.pluginRoot || ''
 const taskContext = a.context || ''
+
+// Plugin workflows are also user-invocable as /precheck:review, which bypasses
+// the command that supplies args. Without pluginRoot the scout can't find its scripts.
+if (!pluginRoot) {
+  return { error: 'precheck:review was started without args. Run /precheck instead.' }
+}
 
 const SCOUT = {
   type: 'object',
