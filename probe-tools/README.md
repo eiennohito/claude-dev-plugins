@@ -1,6 +1,6 @@
 # probe-tools
 
-A single-hook Claude Code plugin that probes the machine at **session start** and
+A Claude Code plugin that probes the machine at **session start** and
 injects a concise capability summary into context — which modern CLI tools are
 installed, which package managers exist, and any project-specific binaries — so
 the agent reaches for the fast/available tool (`rg` over `grep -r`, `fd` over
@@ -19,6 +19,15 @@ On `SessionStart` (matcher `startup|resume|compact`) it runs
 4. Returns the result as `additionalContext` plus a one-line `systemMessage`.
 
 It re-runs on `compact` because the summary is lost when context is summarized.
+
+## Explicit subagent model
+
+A `PreToolUse` hook ([`bin/require-agent-model.py`](bin/require-agent-model.py))
+denies any `Agent` tool call that doesn't set `model`, telling the agent to pick
+one (sonnet by default, opus if sonnet falls short, fable only for complex plan
+validation the user asked for). Without it, subagents inherit the session's
+model, which is usually the most expensive one. Forks are exempt because they
+always run on the parent model.
 
 ## Install (local, unpublished)
 
