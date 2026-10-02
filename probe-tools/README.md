@@ -12,7 +12,10 @@ there.
 On `SessionStart` (matcher `startup|resume|compact`) it runs
 [`bin/probe-tools.py`](bin/probe-tools.py), which:
 
-1. Reads basic platform facts (OS, release, arch, shell) — cross-platform.
+1. Reads basic platform facts (OS, release, arch, shell) — cross-platform. If
+   the shell isn't bash, it adds a line saying the Bash tool runs in that shell;
+   for zsh, that line also lists the options changed from zsh defaults
+   (`zsh -c setopt`).
 2. Probes a built-in set of modern-CLI tools and package managers with
    `command -v` + `--version`.
 3. Loads an optional per-project config (below) to extend/override the set.

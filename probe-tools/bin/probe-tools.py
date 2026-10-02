@@ -105,6 +105,29 @@ def _platform_info():
     }
 
 
+def _shell_note(shell):
+    """One line telling the agent the Bash tool isn't bash, or None if it is."""
+    name = os.path.basename(shell)
+    if name == "zsh":
+        ver = run([shell, "-c", "print $ZSH_VERSION"]) or "(unknown version)"
+        # Bare `setopt` lists only options that differ from zsh defaults; it
+        # prints one per line, so join them all rather than run()'s first line.
+        try:
+            opts = subprocess.run(
+                [shell, "-c", "setopt"], capture_output=True, text=True, timeout=2
+            ).stdout.split()
+            changed = ", ".join(opts) or "none"
+        except (OSError, subprocess.SubprocessError):
+            changed = "unknown"
+        return (
+            f"The Bash tool runs commands in zsh {ver}, not bash."
+            f" Options changed from zsh defaults: {changed}."
+        )
+    if name not in ("bash", "sh", "unknown"):
+        return f"The Bash tool runs commands in {name}, not bash."
+    return None
+
+
 class _Api:
     """Helper surface passed to a project probe() function."""
 
@@ -254,6 +277,11 @@ def _render_context(report):
         "",
         f"- OS: {plat['name']} {plat['release']} ({plat['arch']})",
         f"- Shell: {plat['shell']}",
+    ]
+    shell_note = _shell_note(plat["shell"])
+    if shell_note:
+        lines.append(f"- {shell_note}")
+    lines += [
         "",
         "## Available tools",
         "",
