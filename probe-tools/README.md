@@ -32,6 +32,52 @@ validation the user asked for). Without it, subagents inherit the session's
 model, which is usually the most expensive one. Forks are exempt because they
 always run on the parent model.
 
+## Destructive-command guard
+
+A `PreToolUse` hook on `Bash` ([`bin/guard-destructive.py`](bin/guard-destructive.py))
+catches honest mistakes, not malice: the agent runs A, but what executes is B.
+It does not judge whether destroying the intended target is OK. That depends
+on context, such as a checkpoint taken with `git stash` or the user asking for
+it, and is left to permission rules and the auto-mode classifier. The hook only
+denies `rm`, `rm-list.py`, `find -delete`, and git commands that can lose work
+when the command text doesn't pin down the target:
+
+- **cwd drift.** A relative `rm` target, or a git command without `-C`, is
+  allowed only when the session's cwd is the project root (or a linked worktree
+  of it, where worktree-isolated subagents run) and the command doesn't `cd`
+  elsewhere first. An in-command `cd` isn't trusted: it persists into later
+  calls, and Claude Code strips a `cd` to the current directory. For git, the
+  denial says to rerun with `git -C <cwd>` if that repo was meant, or to `cd`
+  to the project root otherwise. Only git that can lose work is checked
+  (`reset --hard`, `checkout`/`restore` of paths, `clean`, `rebase`,
+  `stash drop`, `branch -D`, force push, …). Read-only and additive git
+  (`status`, `log`, `add`, `commit`, `stash` push, …) loses nothing in the
+  wrong repo.
+- **Expansion.** A variable that this command doesn't assign, or a `$(…)`,
+  can't be part of a recursive target's path: an empty `$DIR` turns
+  `rm -rf $DIR/x` into `rm -rf /x`. A whole-variable target (`"$tmpdir"`) is
+  fine, because empty means no operand. So is an unresolved filename for a
+  non-recursive `rm`. Literal assignments in the same command, `~`, `$HOME`,
+  and globs resolve.
+- **Catastrophic targets.** `/`, a top-level directory, or home, including a
+  bare `*` directly under them.
+- **Runtime-computed sets.** `find -delete`, `find -exec rm`, `xargs rm`, and
+  a force push without an explicit remote and refspec. For deletion, the
+  denial message gives the safe alternative in three separate calls: write the
+  candidates to a list file (`find /abs/dir … > /abs/list.txt`), review it,
+  then run `python3 bin/rm-list.py /abs/list.txt`.
+  [`rm-list.py`](bin/rm-list.py) deletes exactly the listed absolute paths and
+  never expands anything. It validates every line first and deletes nothing if
+  any line is unsafe.
+
+Commands after the destructive one aren't inspected, since they can't change
+its target. Replayed against ~23.7k historical Bash calls, it denied 0.37%. Most
+denials are `cd /abs && rm rel` or `cd /abs && git checkout/rebase`, which
+cost one retry with an absolute path or `git -C`. The hook parses with `shlex`, masks `$(…)` while
+respecting quotes, and strips heredoc bodies, so a commit message that
+mentions these commands isn't flagged. If it can't parse the command, it
+denies with a hint.
+
 ## Install (local, unpublished)
 
 ```sh
