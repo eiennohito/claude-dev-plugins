@@ -30,7 +30,15 @@ denies any `Agent` tool call that doesn't set `model`, telling the agent to pick
 one (sonnet by default, opus if sonnet falls short, fable only for complex plan
 validation the user asked for). Without it, subagents inherit the session's
 model, which is usually the most expensive one. Forks are exempt because they
-always run on the parent model.
+always run on the parent model. So are agent types whose definition sets a
+concrete `model:` (not `inherit`). The hook looks the type up in the project's
+`.claude/agents/`, in `~/.claude/agents/`, and, for `plugin:name` types, in the
+installed plugin's `agents/`. The session-start summary states the rule, so
+the agent sets `model` on the first try instead of learning it from a denial.
+
+Denials from both `PreToolUse` hooks start with `Denied by probe-tools:`.
+Claude Code labels them "hook error", but they are deliberate denials, not
+crashes.
 
 ## Destructive-command guard
 

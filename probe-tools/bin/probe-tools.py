@@ -309,6 +309,15 @@ def _render_context(report):
             lines.append(f"- {pm} ({ver})")
     else:
         lines.append("(none detected)")
+    lines += [
+        "",
+        "## Subagents",
+        "",
+        "Every Agent tool call must set `model`, or it is denied: sonnet for"
+        " most tasks, opus if sonnet falls short, fable only for complex plan"
+        " validation the user asked for. Exempt: forks, and agent types whose"
+        " definition sets its own model.",
+    ]
     for title, body in sections:
         lines.append("")
         lines.append(f"## {title or 'Project'}")

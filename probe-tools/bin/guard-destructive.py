@@ -460,7 +460,7 @@ def deny(reason):
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": reason,
+            "permissionDecisionReason": "Denied by probe-tools: " + reason,
         }
     }, ensure_ascii=False))
 
