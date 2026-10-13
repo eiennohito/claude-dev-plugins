@@ -20,7 +20,6 @@ Call the **Workflow** tool with:
 - `name`: `precheck:review`
 - `args` (a real JSON object, not a string):
   - `input`      ← `$ARGUMENTS` (verbatim user input — may be a plan file path, git range, focus description, or empty)
-  - `pluginRoot` ← `${CLAUDE_PLUGIN_ROOT}`
   - `context`    ← your one-sentence task summary (or `""` if none)
 
 ## Step 2 — Prepare for synthesis

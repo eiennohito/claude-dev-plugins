@@ -203,9 +203,13 @@ every turn**. Internalize this model:
   the command body. *Reason: verified by spike; the command's prelude and
   `allowed-tools` silently stop applying.*
 - **A bundled workflow is also user-invocable as `/<plugin>:<name>`,** without the
-  args its command supplies. Guard on a required arg and return an error pointing
-  at the command. *Reason: otherwise a direct run proceeds with blank args and fails
-  in confusing ways downstream.*
+  args its command supplies, and its args arrive as the user's raw text string.
+  Make it work without the command: get plugin paths from agent bodies
+  (`${CLAUDE_PLUGIN_ROOT}` expands there), not from args, and treat a non-JSON
+  string as the main input. *Reason: users pick it from autocomplete. An "error:
+  run /x instead" guard fails anyway: the session agent can't invoke a
+  `disable-model-invocation` skill, so it improvises by re-launching the workflow
+  with hand-filled args.*
 - **`allowed-tools` is the only frontmatter field with `${…}` expansion.** Command
   and skill bodies expand at invocation (before `` ```! `` blocks run); `allowed-tools`
   and agent bodies expand at plugin load; agent `tools` never expands. *Reason: read

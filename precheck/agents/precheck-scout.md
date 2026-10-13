@@ -13,14 +13,13 @@ output — the workflow uses it to spawn reviewers.
 Your prompt carries:
 - `Input`: the user's raw input (may be a plan file path, git range, focus
   description like "focus on auth", or empty)
-- `Plugin root`: absolute path to the precheck plugin directory
 
 ## Protocol
 
 1. **Capture the diff.** Always pass the raw input to capture-diff — it handles
    classification internally (file path vs git range vs free-form text):
    ```
-   python3 "<plugin-root>/bin/capture-diff.py" <input>
+   python3 "${CLAUDE_PLUGIN_ROOT}/bin/capture-diff.py" <input>
    ```
    If the input is empty, run it with no arguments.
    Parse the KEY=VALUE output. Key fields: `PROJECT_ROOT`, `DIFF_FILE`,

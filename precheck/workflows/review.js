@@ -1,31 +1,23 @@
 export const meta = {
   name: 'review',
-  description: 'Internal to /precheck (run that instead): scout the environment, then fan reviewer subagents over the diff and return structured findings.',
+  description: 'Raw precheck findings without the synthesized report (/precheck gives the full report): scout the environment, then fan reviewer subagents over the diff.',
   phases: [
     { title: 'Scout', detail: 'Capture diff, read config, check codex' },
     { title: 'Review' },
   ],
 }
 
-// args: { input: string, pluginRoot: string, context: string }
+// args: { input: string, context: string }
 // input is the user's raw argument (plan file, git range, focus description, or empty).
-// pluginRoot is the absolute path to the precheck plugin directory.
 // context is the orchestrator's one-sentence summary of the current task (may be empty).
-let a = {}
-try {
-  a = typeof args === 'string' ? JSON.parse(args) : (args || {})
-} catch (_) {
-  a = {}
+// A direct /precheck:review run passes the user's raw text as a string; treat it as input.
+let a = args || {}
+if (typeof a === 'string') {
+  try { a = JSON.parse(a) } catch (_) { /* raw text */ }
+  if (a === null || typeof a !== 'object') a = { input: String(args) }
 }
 const input = a.input || ''
-const pluginRoot = a.pluginRoot || ''
 const taskContext = a.context || ''
-
-// Plugin workflows are also user-invocable as /precheck:review, which bypasses
-// the command that supplies args. Without pluginRoot the scout can't find its scripts.
-if (!pluginRoot) {
-  return { error: 'precheck:review was started without args. Run /precheck instead.' }
-}
 
 const SCOUT = {
   type: 'object',
@@ -73,7 +65,7 @@ const FINDINGS = {
 phase('Scout')
 
 const scout = await agent(
-  `Input: ${input}\nPlugin root: ${pluginRoot}`,
+  `Input: ${input}`,
   { agentType: 'precheck:precheck-scout', model: 'haiku', effort: 'low', schema: SCOUT, phase: 'Scout', label: 'scout' }
 )
 
