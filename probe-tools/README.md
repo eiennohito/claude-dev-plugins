@@ -36,7 +36,7 @@ concrete `model:` (not `inherit`). The hook looks the type up in the project's
 installed plugin's `agents/`. The session-start summary states the rule, so
 the agent sets `model` on the first try instead of learning it from a denial.
 
-Denials from both `PreToolUse` hooks start with `Denied by probe-tools:`.
+Denials from all `PreToolUse` hooks start with `Denied by probe-tools:`.
 Claude Code labels them "hook error", but they are deliberate denials, not
 crashes.
 
@@ -85,6 +85,52 @@ cost one retry with an absolute path or `git -C`. The hook parses with `shlex`, 
 respecting quotes, and strips heredoc bodies, so a commit message that
 mentions these commands isn't flagged. If it can't parse the command, it
 denies with a hint.
+
+## Process-wait guard
+
+A `PreToolUse` hook on `Monitor` and `Bash` ([`bin/guard-monitor.py`](bin/guard-monitor.py))
+denies waits that can hang the session or end too early:
+
+- **Waiting on a process by name.** Claude Code runs every command inside
+  `<shell> -c "… eval '<command>'"`, so `pgrep -f X` always matches that
+  wrapping shell, whose argv contains X: `while pgrep -f X; do sleep 5; done`
+  runs until the timeout. Without `-f`, `pgrep`/`pidof` match the truncated
+  process name (15 chars on Linux), so
+  long script names and processes under a wrapper (`uv`, `npm`, `python3`)
+  never match. Denied in any `Monitor` command (`pgrep`, `pidof`,
+  `ps … | grep`), and in `Bash` inside a `while`/`until … done` loop. One-off
+  `pgrep` inspection in Bash is allowed.
+- **Processes escaping the harness (Bash).** `nohup`, or an `&` that the same
+  command never `wait`s on or kills (`setsid … &`, `disown`, `( … ) > log &`).
+  Such a process throws away what a background Bash command gives for free
+  (stdout+stderr capture into the task output file, an exit notification),
+  runs unsupervised, and leaves no record in the session. There is no opt-out.
+  A subagent's background tasks are killed when it finishes, so a job that
+  must outlive the agent needs a supervisor. Long jobs such as training runs
+  are babysat by the agent that stays alive, handed to the user, or submitted
+  to the environment's scheduler (Slurm, a Kubernetes Job, …). Services and
+  admin processes are registered with the environment's service manager
+  (systemd, launchd, docker compose, …). `&` inside quotes, an escaped `\&`,
+  and `&&`/`2>&1`/`&>` don't count.
+
+The denial gives the preferred options, in order:
+1. To wait for a process, launch it as a background Bash command and add no
+   Monitor. The harness captures stdout+stderr to the task output file and
+   notifies on exit, including a crash or SIGKILL.
+2. Use Monitor only for events that aren't the process exiting: output to
+   react to while it runs (`tail -n +1 -F /abs/task.output | grep --line-buffered …`,
+   while the background launch still reports the exit), or events outside any
+   process, such as an external service. For persistent or important work,
+   the process serves a websocket that Monitor binds to with `ws`.
+3. For anything more complex, write a Python launcher script that watches the
+   process and prints events, and launch it in the background, rather than
+   emulating that in shell.
+
+Replayed against ~23.9k historical Bash calls, it denied 151 (0.63%): 66
+`nohup` launches, 45 other `&` escapes, and 40 name-based waits. The one
+known false positive is an `&` inside `$'…'` quoting, which isn't masked. It also denied 4 of 59 `Monitor`
+calls, all name-based waits. Heredoc bodies and comments
+are ignored, so writing a launcher script through a heredoc isn't flagged.
 
 ## Install (local, unpublished)
 

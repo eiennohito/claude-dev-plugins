@@ -32,6 +32,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Monitor|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/guard-monitor.py\"",
+            "timeout": 5
+          }
+        ]
       }
     ]
   }
