@@ -60,7 +60,7 @@ are appended below it (`--- contents of <path> ---`). Paths resolve from the rep
 root, must be inside the repo, are de-duped, and expand one level deep.
 
 `context.md` and `<dimension>.md` reach the reviewers through a **`SubagentStart`
-hook** (`hooks/hooks.json` → `bin/inject-context.py`): when a `precheck-*` reviewer
+hook** (`bin/hook.py` → `lib/reviewer_context.py`): when a `precheck-*` reviewer
 spawns, the hook reads the matching `.claude/precheck/` files and injects them as
 `additionalContext`. The orchestrator threads no paths and the reviewers read no
 files — customization is automatic and costs the main session nothing. (Custom
@@ -68,7 +68,7 @@ reviewers run as `general-purpose`, which the hook can't target, so the
 orchestrator passes `context.md` to those in-prompt instead.)
 
 `synthesis.md` reaches the orchestrator through a **`PostToolUse` hook**
-(`hooks/hooks.json` → `bin/inject-synthesis.py`): when the orchestrator reads
+(`bin/hook.py` → `lib/synthesis_rules.py`): when the orchestrator reads
 `lib/synthesis.md`, the hook checks for `.claude/precheck/synthesis.md` and
 appends its contents as a follow-up attachment. The base synthesis rules always
 apply; per-project rules add to them (severity overrides, extra sections,
@@ -99,11 +99,14 @@ precheck/
 ├── skills/precheck-config/   /precheck-config: interactive setup/repair of .claude/precheck/
 ├── workflows/review.js       bundled workflow `precheck:review` (deterministic fan-out)
 ├── agents/precheck-*.md      built-in reviewer subagents (generic identities)
-├── hooks/hooks.json          hook registrations (SubagentStart + PostToolUse)
+├── hooks/hooks.json          registers bin/hook.py for SubagentStart + PostToolUse
+├── bin/hook.py               the only hook script: routes each event to lib/
 ├── lib/synthesis.md          report merge/format spec (read at synthesis)
+├── lib/reviewer_context.py   SubagentStart: injects .claude/precheck/ rules into reviewers
+├── lib/codex_prompts.py      SubagentStart (scout): expands codex prompt files
+├── lib/synthesis_rules.py    PostToolUse on Read: appends .claude/precheck/synthesis.md
+├── lib/includes.py           @path / @{path} expansion shared by the above
 ├── bin/capture-diff.py       diff capture + semi-diff + .claude/precheck/ discovery + excludes
-├── bin/inject-context.py     SubagentStart hook: injects .claude/precheck/ rules
-├── bin/inject-synthesis.py   PostToolUse hook: appends .claude/precheck/synthesis.md
 ├── bin/config-doctor.py      inspects/validates .claude/precheck/ (used by /precheck-config)
 ├── examples/precheck/        copy-paste customization templates
 └── spike/                    dev-only: builds a sample repo to exercise /precheck

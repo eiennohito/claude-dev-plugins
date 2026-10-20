@@ -6,16 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/inject-context.py\""
-          }
-        ]
-      },
-      {
-        "matcher": "precheck-scout",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/inject-codex.py\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/hook.py\""
           }
         ]
       }
@@ -26,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/inject-synthesis.py\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/hook.py\""
           }
         ]
       }
