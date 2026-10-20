@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/probe-tools.py\"",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/hook.py\"",
             "timeout": 10
           }
         ]
@@ -14,31 +14,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Agent|Task",
+        "matcher": "Agent|Task|Bash|Monitor",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/require-agent-model.py\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/guard-destructive.py\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Monitor|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/guard-monitor.py\"",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/hook.py\"",
             "timeout": 5
           }
         ]

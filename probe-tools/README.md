@@ -10,14 +10,14 @@ there.
 ## What it does
 
 On `SessionStart` (matcher `startup|resume|compact`) it runs
-[`bin/probe-tools.py`](bin/probe-tools.py), which:
+[`lib/probe.py`](lib/probe.py), which:
 
 1. Reads basic platform facts (OS, release, arch, shell) — cross-platform. If
    the shell isn't bash, it adds a line saying the Bash tool runs in that shell;
    for zsh, that line also lists the options changed from zsh defaults
    (`zsh -c setopt`).
 2. Probes a built-in set of modern-CLI tools and package managers with
-   `command -v` + `--version`.
+   `command -v` + `--version`, concurrently.
 3. Loads an optional per-project config (below) to extend/override the set.
 4. Returns the result as `additionalContext` plus a one-line `systemMessage`.
 
@@ -25,7 +25,7 @@ It re-runs on `compact` because the summary is lost when context is summarized.
 
 ## Explicit subagent model
 
-A `PreToolUse` hook ([`bin/require-agent-model.py`](bin/require-agent-model.py))
+A `PreToolUse` check ([`lib/agent_model.py`](lib/agent_model.py))
 denies any `Agent` tool call that doesn't set `model`, telling the agent to pick
 one (sonnet by default, opus if sonnet falls short, fable only for complex plan
 validation the user asked for). Without it, subagents inherit the session's
@@ -36,13 +36,44 @@ concrete `model:` (not `inherit`). The hook looks the type up in the project's
 installed plugin's `agents/`. The session-start summary states the rule, so
 the agent sets `model` on the first try instead of learning it from a denial.
 
-Denials from all `PreToolUse` hooks start with `Denied by probe-tools:`.
+Denials from all `PreToolUse` checks start with `Denied by probe-tools:`.
 Claude Code labels them "hook error", but they are deliberate denials, not
 crashes.
 
+## How the hooks run
+
+[`hooks/hooks.json`](hooks/hooks.json) registers one script,
+[`bin/hook.py`](bin/hook.py), once per event; it routes on the event and tool
+and imports only the checks that tool needs. The `PreToolUse` matcher lists
+just the tools some check inspects (`Agent|Task|Bash|Monitor`), so other tool
+calls start no process. Every check returns a deny reason or nothing; several
+reasons are joined into one denial, and a check that crashes is skipped
+rather than failing the call.
+
+Shell commands are parsed once per call by
+[`lib/shellparse.py`](lib/shellparse.py), a stdlib-only bash/zsh parser
+(Python 3.8+). It turns the command into the simple commands that would run,
+each with its context: loop, background (`&`, zsh `&!`/`&|`), subshell,
+pipeline, nesting inside `$(…)`/`eval`/`sh -c`/`bash <<EOF`, or a remote
+`ssh` command. Words keep their quoting and expansions, so quoted text,
+comments and heredoc bodies fed to other programs are data, and `${D:-/}x`
+is known to be unresolved. The guards below are written against that
+structure, not regexes over the text. A command it can't parse (0.01% of
+~27k real commands) is denied by the destructive guard with a hint and
+allowed by the others.
+
+Every tool call pays the hook process, so the budget is ~50 ms and never more
+than 100 ms (Python startup is ~20 ms of that). Over the 360-command test
+corpus the hook takes 34 ms median, 47 ms max.
+
+Tests: `python3 tests/test_shellparse.py` (parser and guard unit tests),
+`python3 tests/test_corpus.py [--report]` (verdicts on 360 labelled real agent
+commands from bash and zsh sessions), `python3 tests/test_hook.py` (end to end
+through `sh -c`, with the time budget).
+
 ## Destructive-command guard
 
-A `PreToolUse` hook on `Bash` ([`bin/guard-destructive.py`](bin/guard-destructive.py))
+A `PreToolUse` check on `Bash` ([`lib/destructive.py`](lib/destructive.py))
 catches honest mistakes, not malice: the agent runs A, but what executes is B.
 It does not judge whether destroying the intended target is OK. That depends
 on context, such as a checkpoint taken with `git stash` or the user asking for
@@ -63,7 +94,7 @@ when the command text doesn't pin down the target:
   wrong repo.
 - **Expansion.** A variable that this command doesn't assign, or a `$(…)`,
   can't be part of a recursive target's path: an empty `$DIR` turns
-  `rm -rf $DIR/x` into `rm -rf /x`. A whole-variable target (`"$tmpdir"`) is
+  `rm -rf $DIR/x` into `rm -rf /x`, and `${DIR:-/}x` into `rm -rf /x`. A whole-variable target (`"$tmpdir"`) is
   fine, because empty means no operand. So is an unresolved filename for a
   non-recursive `rm`. Literal assignments in the same command, `~`, `$HOME`,
   and globs resolve.
@@ -78,17 +109,16 @@ when the command text doesn't pin down the target:
   never expands anything. It validates every line first and deletes nothing if
   any line is unsafe.
 
-Commands after the destructive one aren't inspected, since they can't change
-its target. Replayed against ~23.7k historical Bash calls, it denied 0.37%. Most
+Wrappers are seen through (`sudo`, `env`, `noglob`, `timeout`, `xargs`, …),
+as are `eval`, `sh -c '…'` and `bash <<EOF`. Commands run on another host
+through `ssh` aren't checked: their cwd and variables are the remote's. Most
 denials are `cd /abs && rm rel` or `cd /abs && git checkout/rebase`, which
-cost one retry with an absolute path or `git -C`. The hook parses with `shlex`, masks `$(…)` while
-respecting quotes, and strips heredoc bodies, so a commit message that
-mentions these commands isn't flagged. If it can't parse the command, it
-denies with a hint.
+cost one retry with an absolute path or `git -C`. A commit message or heredoc
+that mentions these commands isn't flagged.
 
 ## Process-wait guard
 
-A `PreToolUse` hook on `Monitor` and `Bash` ([`bin/guard-monitor.py`](bin/guard-monitor.py))
+A `PreToolUse` check on `Monitor` and `Bash` ([`lib/monitor.py`](lib/monitor.py))
 denies waits that can hang the session or end too early:
 
 - **Waiting on a process by name.** Claude Code runs every command inside
@@ -98,8 +128,11 @@ denies waits that can hang the session or end too early:
   process name (15 chars on Linux), so
   long script names and processes under a wrapper (`uv`, `npm`, `python3`)
   never match. Denied in any `Monitor` command (`pgrep`, `pidof`,
-  `ps … | grep`), and in `Bash` inside a `while`/`until … done` loop. One-off
+  `ps … | grep`), and in `Bash` inside a `while`/`until … done` loop, also
+  in a remote `ssh` command (sshd runs it through `<shell> -c` too). One-off
   `pgrep` inspection in Bash is allowed.
+- **`pkill -f X` (both tools).** Its pattern is in the wrapping shell's argv,
+  so it kills the command running it. The denial says to kill by PID.
 - **Processes escaping the harness (Bash).** `nohup`, or an `&` that the same
   command never `wait`s on or kills (`setsid … &`, `disown`, `( … ) > log &`).
   Such a process throws away what a background Bash command gives for free
@@ -110,8 +143,9 @@ denies waits that can hang the session or end too early:
   are babysat by the agent that stays alive, handed to the user, or submitted
   to the environment's scheduler (Slurm, a Kubernetes Job, …). Services and
   admin processes are registered with the environment's service manager
-  (systemd, launchd, docker compose, …). `&` inside quotes, an escaped `\&`,
-  and `&&`/`2>&1`/`&>` don't count.
+  (systemd, launchd, docker compose, …). zsh's `&!`/`&|` count; `&` inside
+  quotes, an escaped `\&`, `&&`/`2>&1`/`&>`, and a detach inside a remote
+  `ssh` command don't.
 
 The denial gives the preferred options, in order:
 1. To wait for a process, launch it as a background Bash command and add no
@@ -126,11 +160,8 @@ The denial gives the preferred options, in order:
    process and prints events, and launch it in the background, rather than
    emulating that in shell.
 
-Replayed against ~23.9k historical Bash calls, it denied 151 (0.63%): 66
-`nohup` launches, 45 other `&` escapes, and 40 name-based waits. The one
-known false positive is an `&` inside `$'…'` quoting, which isn't masked. It also denied 4 of 59 `Monitor`
-calls, all name-based waits. Heredoc bodies and comments
-are ignored, so writing a launcher script through a heredoc isn't flagged.
+Heredoc bodies and comments are data, so writing a launcher script through a
+heredoc isn't flagged.
 
 ## Install (local, unpublished)
 

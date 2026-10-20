@@ -180,6 +180,31 @@ every turn**. Internalize this model:
   rules reach the orchestrator without changing the command body or the read
   instruction; the hook fires on every Read but exits immediately for non-matching
   paths (< 1ms).*
+- **Register one hook script per plugin and route inside it** (probe-tools:
+  `bin/hook.py`, one `hooks.json` entry per event, matcher = union of the tools
+  any check needs). *Reason (user direction): routing and shared work (parsing
+  the command once) belong in a real language; N entries spawn N interpreters
+  per tool call. Keep the matcher narrow: unmatched tools spawn nothing.*
+- **Hook budget: ~50 ms target, 100 ms hard limit per tool-call hook** (measured
+  through `sh -c`, enforced by a test); `SessionStart` may be slower since it
+  runs a few times per session. *Reason (user direction): every tool call pays
+  it. Python startup is ~20 ms, so the rest must be lazy imports and linear
+  work; run independent subprocesses (version probes) concurrently.*
+- **Guards deny; they never `ask`.** *Reason (user correction): an `ask` (hook or
+  permission rule) prompts and stalls long, mostly unattended sessions. Deny
+  with a reason that tells the agent what to do instead.*
+- **Inspect shell commands with `lib/shellparse.py`, not regexes over the text.**
+  *Reason: three ad hoc parsers (two guards, py-scratch's `python -c` check)
+  each had their own wrapper list and quoting bugs; replayed on real commands,
+  the regex `python -c` check was wrong 72/360 times. Permission-rule globs have
+  the same flaw: Claude Code splits `;`/`&&` before matching, but `*` still
+  spans quoted text inside each part (`Bash(git * push *)` denied
+  `git log --grep push`).*
+- **Validate command-inspecting hooks against real transcripts.** Mine Bash
+  calls from `~/.claude/projects` (and remote hosts: bash + older Python there),
+  label a diverse sample against the written policy, and keep it as a corpus
+  test. *Reason: synthetic cases miss what agents actually write; the corpus
+  found zsh `&!`, `pkill -f` self-kills and wrapper forms nobody listed.*
 - **Prefer hook injection over having agents run commands.** When data can be
   prepared deterministically (file expansion, availability checks, config reads),
   do it in a `SubagentStart` hook and inject the result. An agent running shell
@@ -251,6 +276,9 @@ every turn**. Internalize this model:
 - **Write invocable scripts in Python 3 stdlib — avoid `jq`/`awk`/bash-isms.**
   *Reason (user correction): fewer external dependencies, easier JSON handling, and
   one language for the whole plugin. JSON parsing/escaping in bash is fragile.*
+- **Keep hook Python 3.8-compatible.** *Reason: the `python3` hooks get is the
+  system one: Apple's Command Line Tools 3.9 on macOS, 3.8 on the Linux hosts in
+  use. No `match`, `X | Y` types, `str.removeprefix`, or `list[str]`.*
 - **Emit JSON with `ensure_ascii=False`.** *Reason: keeps `→`, `—`, and non-ASCII in
   injected rules human-readable instead of `\uXXXX`.*
 - **Put temp files under `$CLAUDE_CODE_TMPDIR` (fallback `$TMPDIR` → system temp), in
