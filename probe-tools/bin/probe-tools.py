@@ -43,6 +43,7 @@ import platform
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 # Default modern-CLI tools worth preferring when present. (cmd, description)
 DEFAULT_TOOLS = [
@@ -228,21 +229,25 @@ def _build(root):
     project, proj_error = _load_project_config(root)
     config_path = os.path.join(root, ".claude", "probe-tools.py")
 
-    # --- probe tools ---
-    tool_specs = _collect_tool_specs(project)
-    available = []  # (cmd, desc, version)
-    for spec in tool_specs:
-        if which(spec["cmd"]):
-            ver = run([spec["cmd"], *spec["version"]]) or "installed"
-            available.append((spec["cmd"], spec["desc"], ver))
-
-    # --- probe package managers ---
+    tool_specs = [s for s in _collect_tool_specs(project) if which(s["cmd"])]
     pms = list(DEFAULT_PKG_MANAGERS)
     if project is not None:
         for pm in getattr(project, "PKG_MANAGERS", []) or []:
             if pm not in pms:
                 pms.append(pm)
-    pms_found = [(pm, version(pm) or "installed") for pm in pms if which(pm)]
+    pms = [pm for pm in pms if which(pm)]
+
+    # Version probes are independent subprocesses (4–75 ms each, npm the
+    # slowest): run them concurrently so the hook costs the slowest probe, not
+    # their sum.
+    with ThreadPoolExecutor(max_workers=len(tool_specs) + len(pms) + 1) as pool:
+        tool_vers = [pool.submit(run, [s["cmd"], *s["version"]]) for s in tool_specs]
+        pm_vers = [pool.submit(run, [pm, "--version"]) for pm in pms]
+        shell_note = pool.submit(_shell_note, plat["shell"])
+        available = [(s["cmd"], s["desc"], f.result() or "installed")
+                     for s, f in zip(tool_specs, tool_vers)]  # (cmd, desc, version)
+        pms_found = [(pm, f.result() or "installed") for pm, f in zip(pms, pm_vers)]
+        shell_note = shell_note.result()
 
     # --- optional custom probe ---
     sections = []
@@ -255,6 +260,7 @@ def _build(root):
 
     return {
         "plat": plat,
+        "shell_note": shell_note,
         "available": available,
         "pms_found": pms_found,
         "sections": sections,
@@ -278,9 +284,8 @@ def _render_context(report):
         f"- OS: {plat['name']} {plat['release']} ({plat['arch']})",
         f"- Shell: {plat['shell']}",
     ]
-    shell_note = _shell_note(plat["shell"])
-    if shell_note:
-        lines.append(f"- {shell_note}")
+    if report["shell_note"]:
+        lines.append(f"- {report['shell_note']}")
     lines += [
         "",
         "## Available tools",
