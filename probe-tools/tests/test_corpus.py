@@ -3,8 +3,9 @@
 corpus.jsonl holds commands mined from Claude Code transcripts (bash on
 Linux, zsh on macOS; usernames and hostnames replaced), each labelled with
 the verdict its policy expects from four consumers: destructive and monitor
-(the probe-tools guards), python_c and push (reference consumers defined
-here, to keep the parser able to answer those questions too).
+(the probe-tools guards), push (a `git push` deny rule, lib/rules.py), and
+python_c (a reference consumer defined here, keeping the parser able to answer
+py-scratch's question too).
 
     python3 tests/test_corpus.py            # unittest
     python3 tests/test_corpus.py --report   # every disagreement, with reasons
@@ -20,11 +21,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "lib"))
 
 import destructive  # noqa: E402
 import monitor  # noqa: E402
+import rules  # noqa: E402
 import shellparse as sp  # noqa: E402
 
 ROOT = "/proj"
 PY = re.compile(r"(python|pypy)(\d+(\.\d+)*)?$")
-GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 
 
 def stdin_body(cmd):
@@ -85,17 +86,11 @@ def python_c(cmds):
     return False
 
 
+PUSH = rules.Rule("git push", "", "test")
+
+
 def push(cmds):
-    for cmd in cmds:
-        if type(cmd.node) is not sp.Simple or cmd.inv.name != "git":
-            continue
-        vals = [a.value or "" for a in cmd.inv.args]
-        i = 0
-        while i < len(vals) and vals[i].startswith("-"):
-            i += 2 if vals[i] in GIT_VALUE_OPTS else 1
-        if i < len(vals) and vals[i] == "push":
-            return True
-    return False
+    return any(type(c.node) is sp.Simple and PUSH.matches(c) for c in cmds)
 
 
 def verdicts(case):

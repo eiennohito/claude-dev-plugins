@@ -221,6 +221,13 @@ def _collect_tool_specs(project):
     return [by_cmd[c] for c in order]
 
 
+def _rules_status(root):
+    """(number of command rules, [errors]) from lib/rules.py's files."""
+    import rules
+    loaded, errors = rules.load(root)
+    return len(loaded), errors
+
+
 def _build(root):
     """Probe everything and return a report dict (shared by hook + diagnose)."""
     plat = _platform_info()
@@ -263,6 +270,7 @@ def _build(root):
         "pms_found": pms_found,
         "sections": sections,
         "proj_error": proj_error,
+        "rules": _rules_status(root),
         "config_path": config_path,
         "config_exists": os.path.isfile(config_path),
         "has_probe": callable(probe_fn),
@@ -340,6 +348,11 @@ def _render_message(report):
         msg += ": " + ", ".join(names)
     if report["proj_error"]:
         msg += f" | .claude/probe-tools.py error — {report['proj_error']}"
+    count, errors = report["rules"]
+    if count:
+        msg += f" | {count} command rule(s)"
+    if errors:
+        msg += " | command rules NOT applied, fix: " + "; ".join(errors)
     return msg
 
 

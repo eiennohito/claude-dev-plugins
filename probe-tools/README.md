@@ -67,9 +67,39 @@ than 100 ms (Python startup is ~20 ms of that). Over the 360-command test
 corpus the hook takes 34 ms median, 47 ms max.
 
 Tests: `python3 tests/test_shellparse.py` (parser and guard unit tests),
+`python3 tests/test_rules.py` (command rules),
 `python3 tests/test_corpus.py [--report]` (verdicts on 360 labelled real agent
 commands from bash and zsh sessions), `python3 tests/test_hook.py` (end to end
 through `sh -c`, with the time budget).
+
+## Command rules
+
+Your own deny rules for shell commands, matched against the parsed command
+instead of the text, as a replacement for `Bash(…)` permission rules.
+Permission rules glob over the text of each `;`/`&&` part, so `*` spans quoted
+text (`Bash(git * push *)` denies `git log --grep push`) and prefix patterns
+miss global options and wrappers (`Bash(git push*)` misses `git --no-pager push`
+and `env X=1 git push`). Rules live in `~/.claude/probe-tools/rules.json`
+(user) and `<repo>/.claude/probe-tools/rules.json` (project); both apply:
+
+```json
+{"deny": [
+  {"command": "git push", "reason": "Pushing is the user's call: say the branch is ready."},
+  {"command": "git push -f|--force|--force-with-lease"},
+  {"command": "make deploy"}
+]}
+```
+
+`command` is a program name, then the leading positional words to match in
+order (for git, after global options such as `-C`/`-c`/`--no-pager`) and
+options that must appear anywhere (`-f` also matches `-fd`, `--hard` also
+`--hard=…`); `a|b` gives alternatives. Wrappers (`sudo`, `env`, `timeout`,
+`xargs`, …), `eval`, `sh -c '…'`, `bash <<EOF` and `ssh host '…'` are seen
+through, and quoted text, comments and heredocs fed to other programs never
+match. There is deliberately no `ask`: a prompt stalls long, unattended
+sessions, so a rule denies with its `reason` as the instruction. The
+session-start message shows how many rules loaded, and names any file that
+failed to parse (such a file applies not at all).
 
 ## Destructive-command guard
 

@@ -32,10 +32,12 @@ def pre_tool_use(data):
             return []
         import destructive
         import monitor
+        import rules
         from shellparse import View
         view = View(tool, command)
         cwd, root = data.get("cwd") or "", os.environ.get("CLAUDE_PROJECT_DIR") or ""
-        checks += [lambda: destructive.check(view, cwd, root), lambda: monitor.check(view)]
+        checks += [lambda: rules.check(view, root), lambda: destructive.check(view, cwd, root),
+                   lambda: monitor.check(view)]
     reasons = []
     for check in checks:
         try:
