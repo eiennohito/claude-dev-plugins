@@ -152,10 +152,41 @@ class Destructive(unittest.TestCase):
         self.assertIsNone(deny_destructive("git commit -m 'rm -rf $D/x'"))
 
     def test_cd_then_relative(self):
-        self.assertTrue(deny_destructive("cd /elsewhere && rm -rf build"))
         self.assertTrue(deny_destructive("cd /elsewhere; git reset --hard"))
         self.assertIsNone(deny_destructive("cd /elsewhere; git status"))
-        self.assertTrue(deny_destructive("bash -c 'cd /x && git clean -fd'"))
+
+    def test_cd_and_chain_pins(self):
+        for c in ("cd /elsewhere && rm -rf build", "cd /w/repo && git reset --hard",
+                  "D=/w/repo; cd $D && git clean -fd", 'cd "$HOME/x" && rm -rf build',
+                  "cd ~/x && rm -rf build", "cd /x && { rm -rf a; rm -rf b; }",
+                  "cd /x && rm -rf b && make; echo done", "cd /x && rm -rf b | wc -l; ls /x",
+                  "cd /x && rm -rf b || true", "cd /x && rm -rf b; rm -rf /x/c",
+                  "(cd /x && rm -rf b)", "cd /proj; rm -rf build",
+                  "bash -c 'cd /x && git clean -fd'"):
+            self.assertIsNone(deny_destructive(c), c)
+
+    def test_cd_not_pinning(self):
+        for c in ("cd /x && rm -rf b; rm -rf c", "cd /x && rm -rf a || rm -rf b",
+                  "cd build && rm -rf out", "cd $D && rm -rf out",
+                  "cd $(git rev-parse --show-toplevel) && git reset --hard",
+                  "(cd /x && rm -rf b); rm -rf c", "cd /x | rm -rf b", "! cd /x && rm -rf b",
+                  "cd - && rm -rf b", "cd /x & rm -rf b", "{ cd /x && rm -rf a; }; rm -rf b",
+                  "f() { cd /x; }; rm -rf b", "cd / && rm -rf usr", "cd /x/* && rm -rf b",
+                  "bash -c 'cd /x' && rm -rf b"):
+            self.assertTrue(deny_destructive(c), c)
+
+    def test_runs_only_after(self):
+        def after(text, x, y):
+            cs = {c.inv.name: c for c in sp.commands(text)}
+            return sp.runs_only_after(cs[x], cs[y])
+        self.assertTrue(after("a && b && c; d", "a", "c"))
+        self.assertFalse(after("a && b && c; d", "a", "d"))
+        self.assertFalse(after("a && b || c", "a", "c"))
+        self.assertTrue(after("a && { b; c; }", "a", "c"))
+        self.assertTrue(after("a && b $(c)", "a", "c"))
+        self.assertTrue(after("a && b | c", "a", "c"))
+        self.assertFalse(after("{ a && b; } && c", "a", "c"))
+        self.assertFalse(after("(a) && c", "a", "c"))
 
     def test_remote_not_checked(self):
         self.assertIsNone(deny_destructive("ssh pod1 'cd /x && rm -rf $D/y'"))

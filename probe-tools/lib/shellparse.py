@@ -1190,11 +1190,13 @@ class Ctx:
     of enclosing substitutions/string evals ('$(', '`', '<(', 'eval', 'sh -c',
     'sh <<', 'ssh', …); remote: ssh host or None; func: enclosing function
     definition name (runs only if called); negated: under `!`; zsh: parsed
-    with zsh rules."""
-    __slots__ = ("loops", "cond", "bg", "subshell", "pipe", "nested", "remote", "func", "negated", "zsh")
+    with zsh rules; chain: the enclosing `&&`/`||` lists, outermost first, as
+    (list id, operand index, operators) — see runs_only_after()."""
+    __slots__ = ("loops", "cond", "bg", "subshell", "pipe", "nested", "remote", "func", "negated", "zsh",
+                 "chain")
 
     def __init__(self, zsh=False):
-        self.loops, self.nested = (), ()
+        self.loops, self.nested, self.chain = (), (), ()
         self.cond = self.subshell = self.negated = False
         self.zsh = zsh
         self.bg = self.pipe = self.remote = self.func = None
@@ -1242,10 +1244,11 @@ BG_OPS = frozenset(("&", "&!", "&|"))
 def _walk(script, ctx, out, depth):
     for ao, sep in script.items:
         c = ctx.but(bg=sep) if sep in BG_OPS else ctx
-        for pl in ao.pipelines:
+        ops = tuple(ao.ops)
+        for j, pl in enumerate(ao.pipelines):
             n = len(pl.cmds)
             for k, node in enumerate(pl.cmds):
-                cc = c
+                cc = c.but(chain=c.chain + ((id(ao), j, ops),))
                 if n > 1:
                     cc = cc.but(pipe=(id(pl), k, n))
                 if pl.negated:
@@ -1268,6 +1271,18 @@ def _walk_redirs(redirs, ctx, out, depth):
                     _walk(p.script, ctx.but(nested=ctx.nested + (p.kind,), subshell=True), out, depth)
                 elif type(p) is Param and p.arg is not None:
                     _subs_of_words([p.arg], ctx, out, depth)
+
+
+def runs_only_after(first, later):
+    """True if `later` (a Cmd after `first`) runs only when `first`'s
+    pipeline succeeded: it is in, or nested in, a later operand of the same
+    `&&` list with no `||` in between (`first && … && later`)."""
+    a, b = first.ctx.chain, later.ctx.chain
+    k = len(a) - 1
+    if k < 0 or len(b) <= k or b[:k] != a[:k] or b[k][0] != a[k][0]:
+        return False
+    i, j, ops = a[k][1], b[k][1], a[k][2]
+    return j > i and all(o == "&&" for o in ops[i:j])
 
 
 def _walk_node(node, ctx, out, depth):

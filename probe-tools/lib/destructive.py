@@ -10,10 +10,9 @@ through four channels:
 1. cwd drift — a relative rm target, or a git command without -C, resolves
    against a cwd the agent may misremember. Allowed only when the hook's real
    cwd is the project root (or a linked worktree of it, where worktree-isolated
-   subagents run) and the command doesn't `cd` elsewhere first. An in-command
-   `cd` isn't trusted: in the Bash tool it persists into later calls, Claude
-   Code strips a `cd` to the current directory, and `cd` itself may be
-   overridden by the user's shell profile. Only git that can lose work is
+   subagents run), or it runs only if an earlier `cd` to a resolvable absolute
+   path succeeded (`cd /abs && … && rm rel`; past the `&&` list, a failed `cd`
+   would have left the shell elsewhere). Only git that can lose work is
    checked (reset --hard, checkout/restore of paths, clean, rebase, stash
    drop, branch -D, force push, …); read-only and additive git (status, log,
    add, commit, stash push, …) loses nothing in the wrong repo.
@@ -45,17 +44,19 @@ GLOB_CHARS = set("*?[]{}")
 GIT_OPTS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 DECLARE = {"export", "local", "declare", "readonly", "typeset"}
 UNRESOLVED = "contains a `$(…)` or a variable this command doesn't assign"
-CD_WHY = ("this command `cd`s first. In the Bash tool, `cd` persists into later "
-          "calls and Claude Code strips a `cd` to the current directory, so this "
-          "hook doesn't rely on it")
+CD_WHY = ("the `cd` before it doesn't pin the directory: only an absolute path, "
+          "literal or assigned in this command, does; a relative one depends on "
+          "where the shell is")
+CD_FAILED = ("it isn't chained by `&&` to the `cd` before it, so if that `cd` "
+             "failed it runs in whatever directory the shell was in")
 RM_LIST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "rm-list.py")
 
 MSG = (
     "This command's target isn't pinned down by the command text, so what "
     "runs may not be what you intend:\n{problems}\n\n"
     "Fix: write the target as a literal absolute path, and for git use "
-    "`git -C /abs/repo …`. Don't prefix `cd` to the current directory: Claude "
-    "Code strips it. Replace unresolvable variables with their literal value."
+    "`git -C /abs/repo …`, or chain the command after `cd /abs/dir &&`. "
+    "Replace unresolvable variables with their literal value."
 )
 LIST_MSG = (
     "\n\nFor pattern-driven deletion, as three separate Bash calls:\n"
@@ -82,6 +83,7 @@ class State:
         self.vars = {}          # assignments seen so far (None = unknown value)
         self.problems = []
         self.hint = False       # add the rm-list.py recipe
+        self.pin = None         # the `cd` cwd depends on: valid while its && chain lasts
 
     def env(self):
         env = {"HOME": os.path.expanduser("~"), "USER": os.environ.get("USER"), "PWD": self.cwd}
@@ -224,9 +226,12 @@ def check_find(st, args):
 def analyze(cmds, st):
     """Walk the executed commands in order, tracking cwd and assignments."""
     from shellparse import Simple, split_assign
+    from shellparse import runs_only_after
     for cmd in cmds:
         if cmd.ctx.remote:
             continue
+        if st.pin is not None and not runs_only_after(st.pin, cmd):
+            st.cwd, st.why, st.actual, st.pin = None, CD_FAILED, None, None
         if type(cmd.node) is not Simple:  # for/select header assigns its variable
             st.vars[cmd.node.var] = None
             continue
@@ -245,9 +250,15 @@ def analyze(cmds, st):
                     st.vars[kv[0]] = kv[1].expand(env)
         elif name in ("cd", "pushd", "popd"):
             target = next((a for a in inv.args if not (a.value or "x").startswith("-")), None)
-            if name == "popd" or st.cwd is None or target is None \
-                    or st.resolve(target)[0] != st.cwd:
-                st.cwd, st.why, st.actual = None, CD_WHY, None  # cd to where we are is a no-op
+            p = target.expand(st.env()) if name != "popd" and target is not None else None
+            p = os.path.normpath(p) if p and p.startswith("/") and not GLOB_CHARS & set(p) else None
+            c = cmd.ctx
+            if p is not None and p == st.cwd:
+                pass  # cd to where we are: same directory whether or not it fails
+            elif p is not None and not (c.pipe or c.bg or c.negated or c.func):
+                st.cwd, st.why, st.actual, st.pin = p, "", None, cmd
+            else:
+                st.cwd, st.why, st.actual, st.pin = None, CD_WHY, None, None
         elif name == "rm-list.py" or (name and name.startswith("python") and inv.args
                                       and os.path.basename(inv.args[0].value or "") == "rm-list.py"):
             st.check_paths("rm-list.py", inv.args if name == "rm-list.py" else inv.args[1:])

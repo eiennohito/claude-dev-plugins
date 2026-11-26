@@ -113,11 +113,10 @@ when the command text doesn't pin down the target:
 
 - **cwd drift.** A relative `rm` target, or a git command without `-C`, is
   allowed only when the session's cwd is the project root (or a linked worktree
-  of it, where worktree-isolated subagents run) and the command doesn't `cd`
-  elsewhere first. An in-command `cd` isn't trusted: it persists into later
-  calls, and Claude Code strips a `cd` to the current directory. For git, the
-  denial says to rerun with `git -C <cwd>` if that repo was meant, or to `cd`
-  to the project root otherwise. Only git that can lose work is checked
+  of it, where worktree-isolated subagents run), or it runs only if an earlier
+  `cd` to a resolvable absolute path succeeded (`cd /abs && … && rm rel`). For
+  git, the denial says to rerun with `git -C <cwd>` if that repo was meant, or
+  to `cd` to the project root otherwise. Only git that can lose work is checked
   (`reset --hard`, `checkout`/`restore` of paths, `clean`, `rebase`,
   `stash drop`, `branch -D`, force push, …). Read-only and additive git
   (`status`, `log`, `add`, `commit`, `stash` push, …) loses nothing in the
@@ -141,10 +140,8 @@ when the command text doesn't pin down the target:
 
 Wrappers are seen through (`sudo`, `env`, `noglob`, `timeout`, `xargs`, …),
 as are `eval`, `sh -c '…'` and `bash <<EOF`. Commands run on another host
-through `ssh` aren't checked: their cwd and variables are the remote's. Most
-denials are `cd /abs && rm rel` or `cd /abs && git checkout/rebase`, which
-cost one retry with an absolute path or `git -C`. A commit message or heredoc
-that mentions these commands isn't flagged.
+through `ssh` aren't checked: their cwd and variables are the remote's. A
+commit message or heredoc that mentions these commands isn't flagged.
 
 ## Process-wait guard
 
