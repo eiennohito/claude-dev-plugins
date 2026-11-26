@@ -88,6 +88,9 @@ const ALL   = ['docs', 'reusability', 'plan-coverage', 'quality', 'security', 'e
 const dims  = (Array.isArray(cfg.dimensions) && cfg.dimensions.length) ? cfg.dimensions : ALL
 const model    = cfg.model || 'sonnet'
 const effortOf = (typeof cfg.effort === 'object' && cfg.effort) || {}
+// Explicit default: at the inherited 'medium', Sonnet 5.5 reviewers spot-check
+// with 1-5 tool calls and skip the semi-diff entirely.
+const reviewEffort = (k) => effortOf[k] || 'high'
 
 
 function ctx(extra) {
@@ -110,7 +113,7 @@ phase('Review')
 const builtins = dims.map((d) => () =>
   agent(
     ctx(d === 'plan-coverage' && plan ? `Plan / focus: ${plan}` : ''),
-    { agentType: `precheck:precheck-${d}`, model, effort: effortOf[d], schema: FINDINGS, phase: 'Review', label: `review:${d}` }
+    { agentType: `precheck:precheck-${d}`, model, effort: reviewEffort(d), schema: FINDINGS, phase: 'Review', label: `review:${d}` }
   )
 )
 
@@ -118,7 +121,7 @@ const customDefs = Array.isArray(cfg.custom) ? cfg.custom : []
 const customs = customDefs.map((c) => () =>
   agent(
     `${c.instructions}\n\n${ctx('')}`,
-    { agentType: 'general-purpose', model, effort: effortOf[c.name], schema: FINDINGS, phase: 'Review', label: `review:${c.name || 'custom'}` }
+    { agentType: 'general-purpose', model, effort: reviewEffort(c.name), schema: FINDINGS, phase: 'Review', label: `review:${c.name || 'custom'}` }
   )
 )
 

@@ -157,6 +157,13 @@ every turn**. Internalize this model:
   more. *Reason: a `general-purpose` agent carries the full toolset → much larger
   base context (≈5× cache-create here) and tends to over-explore. Smaller surface =
   cheaper + faster + more predictable.*
+- **Set `effort` explicitly on worker agents; don't inherit the default.** Model
+  aliases (`sonnet`) and default effort move with Claude Code updates. *Reason:
+  when `sonnet` became Sonnet 5.5 at inherited `medium`, precheck reviewers dropped
+  from 10–50 tool calls to 1–5 and often skipped the diff entirely. Runs still
+  "succeeded", so only transcript tool-call counts revealed it. Judge cost against
+  a known-good run, not a degraded one: `high` landed back inside the pre-regression
+  range (~560k tokens vs 470k–820k), not at a premium.*
 
 ## Hooks (`SubagentStart`, `PostToolUse`)
 
